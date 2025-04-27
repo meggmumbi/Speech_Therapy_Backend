@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from .. import models
+from ..models import Caregiver
 from ..schemas import (
     activity_category,
     activity_item,
@@ -12,7 +13,7 @@ from ..schemas import (
 )
 from ..schemas.session_activity import SessionActivityCreate
 from ..database import get_db
-from ..utils.openai_utils import generate_image, generate_pronunciation_audio
+from ..utils.openai_utils import generate_image, generate_pronunciation_audio, download_image
 from ..utils.auth import get_current_user
 
 
@@ -23,7 +24,8 @@ router = APIRouter(tags=["activities"])  # Add tags parameter
 @router.post("/categories/", response_model=activity_category.ActivityCategory)
 async def create_category(
         category: activity_category.ActivityCategoryCreate,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+current_user: Caregiver = Depends(get_current_user)
 ):
     db_category = models.ActivityCategory(**category.dict())
     db.add(db_category)
@@ -33,7 +35,7 @@ async def create_category(
 
 
 @router.get("/categories/", response_model=List[activity_category.ActivityCategory])
-def list_categories(db: Session = Depends(get_db)):
+def list_categories(db: Session = Depends(get_db),current_user: Caregiver = Depends(get_current_user)):
     return db.query(models.ActivityCategory).all()
 
 
@@ -48,7 +50,14 @@ async def create_item(
 
     # Generate image if requested
     if item.generate_image:
-        db_item.image_url = await generate_image(item.name)
+        # Step 1: Generate the image URL using OpenAI
+        image_url = await generate_image(item.name)
+
+        # Step 2: Download the image and convert it to base64
+        image_base64 = await download_image(image_url)
+
+        # Save the base64 image to the database
+        db_item.image_url = image_base64
         db_item.audio_url = await generate_pronunciation_audio(item.name)
 
     db.add(db_item)

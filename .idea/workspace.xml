@@ -4,11 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="Asd Speech therapy backend">
-      <change afterPath="$PROJECT_DIR$/app/api/ws_routes.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/ws/websocket.py" afterDir="false" />
+    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="feat: websocket connection">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/activities.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/activities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/analytics.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/analytics.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/children.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/children.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/ml/recommendation_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/ml/recommendation_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/utils/openai_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/openai_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -72,7 +74,7 @@
       <workItem from="1745528602746" duration="1134000" />
       <workItem from="1745529802996" duration="5726000" />
       <workItem from="1745615387210" duration="33000" />
-      <workItem from="1745657612324" duration="13522000" />
+      <workItem from="1745657612324" duration="34325000" />
     </task>
     <task id="LOCAL-00001" summary="Asd Speech therapy backend">
       <option name="closed" value="true" />
@@ -82,7 +84,15 @@
       <option name="project" value="LOCAL" />
       <updated>1745534755435</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="feat: websocket connection">
+      <option name="closed" value="true" />
+      <created>1745699246523</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1745699246523</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -90,6 +100,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Asd Speech therapy backend" />
-    <option name="LAST_COMMIT_MESSAGE" value="Asd Speech therapy backend" />
+    <MESSAGE value="feat: websocket connection" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: websocket connection" />
   </component>
 </project>
