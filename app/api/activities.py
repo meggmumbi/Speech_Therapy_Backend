@@ -25,7 +25,7 @@ router = APIRouter(tags=["activities"])  # Add tags parameter
 async def create_category(
         category: activity_category.ActivityCategoryCreate,
         db: Session = Depends(get_db),
-current_user: Caregiver = Depends(get_current_user)
+        current_user: Caregiver = Depends(get_current_user)
 ):
     db_category = models.ActivityCategory(**category.dict())
     db.add(db_category)
@@ -43,7 +43,8 @@ def list_categories(db: Session = Depends(get_db),current_user: Caregiver = Depe
 @router.post("/items/", response_model=activity_item.ActivityItem)
 async def create_item(
         item: activity_item.ActivityItemCreate,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: models.Caregiver = Depends(get_current_user)
 ):
     # Create base item
     db_item = models.ActivityItem(**item.dict(exclude={"generate_image"}))
@@ -64,6 +65,42 @@ async def create_item(
     db.commit()
     db.refresh(db_item)
     return db_item
+
+
+@router.delete("/items/{item_id}", status_code=204)
+async def delete_activity_item(
+        item_id: uuid.UUID,
+        db: Session = Depends(get_db),
+        current_user: models.Caregiver = Depends(get_current_user)
+):
+    """
+    Delete an activity item from a category
+    - Checks if item exists
+    - Verifies user has permission
+    - Deletes the item
+    - Returns 204 No Content on success
+    """
+    # Get the item
+    db_item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Check if item is used in any sessions (optional)
+    used_in_sessions = db.query(models.SessionActivity).filter(
+        models.SessionActivity.item_id == item_id
+    ).first()
+
+    if used_in_sessions:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete item that has been used in therapy sessions"
+        )
+
+    # Delete the item
+    db.delete(db_item)
+    db.commit()
+
+    return None  # No Content
 
 
 @router.get("/categories/{category_id}/items", response_model=List[activity_item.ActivityItem])
