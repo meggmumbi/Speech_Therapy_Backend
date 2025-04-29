@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import uuid
 from typing import List
+
+from .. import schemas
 from ..services import performance_updater, Recommender, ProgressTracker
 from ..database import get_db
 from ..models import TherapySession, SessionActivity, ChildPerformance, Caregiver
+from ..services.session_analytics import SessionAnalytics
 from ..utils.auth import get_current_user
 
 router = APIRouter(tags=["analytics"])
@@ -102,3 +105,24 @@ current_user: Caregiver = Depends(get_current_user)
 ):
     tracker = ProgressTracker(db)
     return tracker.get_progress_trends(child_id)
+
+@router.get("/sessions/{session_id}/overview", response_model=schemas.SessionOverview)
+def get_session_overview(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive overview of a therapy session including:
+    - Basic session info
+    - Performance metrics
+    - Activity-by-activity breakdown
+    - Identified strengths
+    - Areas needing improvement
+    - Personalized recommendations
+    """
+    try:
+        analyzer = SessionAnalytics(db)
+        overview = analyzer.get_session_overview(session_id)
+        return overview
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

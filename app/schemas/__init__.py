@@ -2,7 +2,8 @@ from .child import Child, ChildBase, ChildCreate
 from .caregiver import Caregiver, CaregiverBase, CaregiverCreate
 from .activity_category import ActivityCategory, ActivityCategoryBase, ActivityCategoryCreate
 from .activity_item import ActivityItem, ActivityItemBase, ActivityItemCreate
-from .therapy_session import TherapySession, TherapySessionBase, TherapySessionCreate
+from .therapy_session import TherapySession, TherapySessionBase, TherapySessionCreate, SessionActivityOverview, \
+    SessionOverview
 from .session_activity import SessionActivity, SessionActivityBase, SessionActivityCreate
 from .feedback import Feedback, FeedbackBase, FeedbackCreate
 
@@ -11,7 +12,7 @@ __all__ = [
     "Caregiver", "CaregiverBase", "CaregiverCreate",
     "ActivityCategory", "ActivityCategoryBase", "ActivityCategoryCreate",
     "ActivityItem", "ActivityItemBase", "ActivityItemCreate",
-    "TherapySession", "TherapySessionBase", "TherapySessionCreate",
+    "TherapySession", "TherapySessionBase", "TherapySessionCreate","SessionActivityOverview","SessionOverview",
     "SessionActivity", "SessionActivityBase", "SessionActivityCreate",
     "Feedback", "FeedbackBase", "FeedbackCreate"
 ]
