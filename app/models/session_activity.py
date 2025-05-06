@@ -2,6 +2,9 @@ from sqlalchemy import Column, ForeignKey, Boolean, Integer, Float, String, Date
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
+
+from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -14,6 +17,10 @@ class SessionActivity(Base):
     attempt_number = Column(Integer, default=1)
     is_correct = Column(Boolean)
     response_type = Column(String(10))  # 'verbal' or 'select'
+    response_text = Column(String)
+    feedback = Column(String)
     pronunciation_score = Column(Float)
     response_time_seconds = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
+    session = relationship("TherapySession", back_populates="activities")
+    item = relationship("ActivityItem")

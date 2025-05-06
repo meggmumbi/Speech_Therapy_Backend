@@ -2,6 +2,9 @@ from sqlalchemy import Column, DateTime, ForeignKey, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
+
+from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -16,3 +19,6 @@ class TherapySession(Base):
     end_time = Column(DateTime)
     current_level = Column(String(20))
     is_completed = Column(Boolean, default=False)
+    child = relationship("Child")
+    category = relationship("ActivityCategory")
+    activities = relationship("SessionActivity", back_populates="session")
