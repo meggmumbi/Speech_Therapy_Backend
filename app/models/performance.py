@@ -2,6 +2,9 @@ from sqlalchemy import Column, Float, ForeignKey, DateTime, Integer
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
+
+from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -17,3 +20,6 @@ class ChildPerformance(Base):
     selection_attempts = Column(Integer, default=0)
     selection_success = Column(Integer, default=0)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    child = relationship("Child", backref="performances")
+    category = relationship("ActivityCategory", backref="performances")

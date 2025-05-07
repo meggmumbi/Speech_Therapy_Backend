@@ -1,6 +1,9 @@
 from sqlalchemy import Column, String, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -13,3 +16,5 @@ class ActivityItem(Base):
     image_url = Column(String(300))  # Will store OpenAI DALL-E generated image URL
     audio_url = Column(String(300))  # For pronunciation examples
     difficulty_level = Column(String(20))  # Can override category level
+
+    category = relationship("ActivityCategory", back_populates="items")

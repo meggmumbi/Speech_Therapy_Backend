@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List
 import pandas as pd
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from ..models import TherapySession
 
 
@@ -26,11 +26,15 @@ class ProgressTracker:
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
 
-        sessions = self.db.query(TherapySession).filter(
+        sessions = self.db.query(TherapySession) \
+            .options(joinedload(TherapySession.activities),
+                     joinedload(TherapySession.category)) \
+            .filter(
             TherapySession.child_id == child_id,
             TherapySession.start_time >= start_date,
             TherapySession.start_time <= end_date
-        ).all()
+        ) \
+            .all()
 
         data = []
         for session in sessions:
@@ -70,3 +74,27 @@ class ProgressTracker:
                 "starting_score": weekly.iloc[0]
             }
         return {"trend": "insufficient data", "rate": 0}
+
+    def _identify_improvement_areas(self, weekly: pd.DataFrame, monthly: pd.DataFrame) -> List[str]:
+        """Identify areas needing improvement based on trends"""
+        improvement_areas = []
+
+        # Check weekly data
+        if not weekly.empty:
+            weekly_low = weekly[weekly['score'] < 0.6]
+            if not weekly_low.empty:
+                weak_categories = weekly_low['category'].value_counts().index.tolist()
+                improvement_areas.append(
+                    f"Recent challenges with: {', '.join(weak_categories[:3])}"
+                )
+
+        # Check monthly data
+        if not monthly.empty:
+            monthly_avg = monthly.groupby('category')['score'].mean()
+            if not monthly_avg.empty:
+                weakest_category = monthly_avg.idxmin()
+                improvement_areas.append(
+                    f"Long-term focus needed on: {weakest_category}"
+                )
+
+        return improvement_areas if improvement_areas else ["No specific improvement areas identified"]

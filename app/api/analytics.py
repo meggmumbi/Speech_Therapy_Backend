@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 import uuid
 from typing import List
 
-from .. import schemas
+from .. import schemas, models
 from ..services import performance_updater, Recommender, ProgressTracker
 from ..database import get_db
 from ..models import TherapySession, SessionActivity, ChildPerformance, Caregiver
@@ -16,13 +16,18 @@ router = APIRouter(tags=["analytics"])
 @router.get("/children/{child_id}/progress")
 def get_child_progress(
         child_id: uuid.UUID,
-        db: Session = Depends(get_db),
-
+        db: Session = Depends(get_db)
 ):
-    # Update all performance metrics first
-    categories = db.query(TherapySession.category_id).filter(
-        TherapySession.child_id == child_id
-    ).distinct().all()
+    # Verify child exists
+    child = db.query(models.Child).filter(models.Child.id == child_id).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    # Update performance metrics
+    categories = db.query(models.TherapySession.category_id) \
+        .filter(models.TherapySession.child_id == child_id) \
+        .distinct() \
+        .all()
 
     for category in categories:
         performance_updater.update_performance_metrics(db, child_id, category[0])
@@ -32,11 +37,11 @@ def get_child_progress(
     recommendations = recommender.get_recommendations(child_id)
 
     return {
-        "progress": recommendations["progress_tracking"],
+        "progress": recommendations.get("progress_tracking", {}),
         "recommendations": {
-            "practice_more": recommendations["practice_more"],
-            "next_activities": recommendations["next_activities"],
-            "encouragement": recommendations["encouragement"]
+            "practice_more": recommendations.get("practice_more", []),
+            "next_activities": recommendations.get("next_activities", []),
+            "encouragement": recommendations.get("encouragement", "")
         }
     }
 
@@ -74,15 +79,22 @@ current_user: Caregiver = Depends(get_current_user)
 def get_performance_details(
         child_id: uuid.UUID,
         db: Session = Depends(get_db),
-current_user: Caregiver = Depends(get_current_user)
+        current_user: models.Caregiver = Depends(get_current_user)
 ):
-    performances = db.query(ChildPerformance).filter(
-        ChildPerformance.child_id == child_id
-    ).all()
+    # Verify child exists and user has access
+    child = db.query(models.Child).filter(models.Child.id == child_id).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    # Get performances with category loaded
+    performances = db.query(models.ChildPerformance) \
+        .options(joinedload(models.ChildPerformance.category)) \
+        .filter(models.ChildPerformance.child_id == child_id) \
+        .all()
 
     return [
         {
-            "category": perf.category.name,
+            "category": perf.category.name if perf.category else "General",
             "overall_score": perf.overall_score,
             "verbal_accuracy": (
                 perf.verbal_success / perf.verbal_attempts
@@ -101,10 +113,13 @@ current_user: Caregiver = Depends(get_current_user)
 def get_progress_trends(
     child_id: uuid.UUID,
     db: Session = Depends(get_db),
-current_user: Caregiver = Depends(get_current_user)
+    current_user: models.Caregiver = Depends(get_current_user)
 ):
-    tracker = ProgressTracker(db)
-    return tracker.get_progress_trends(child_id)
+    try:
+        tracker = ProgressTracker(db)
+        return tracker.get_progress_trends(child_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/sessions/{session_id}/overview", response_model=schemas.SessionOverview)
 def get_session_overview(

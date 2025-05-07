@@ -1,6 +1,9 @@
 from sqlalchemy import Column, String
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -11,3 +14,9 @@ class ActivityCategory(Base):
     name = Column(String(50), unique=True, nullable=False)
     description = Column(String(200))
     difficulty_level = Column(String(20))  # 'easy', 'medium', 'hard'
+
+    items = relationship(
+        "ActivityItem",
+        back_populates="category",
+        cascade="all, delete-orphan"
+    )

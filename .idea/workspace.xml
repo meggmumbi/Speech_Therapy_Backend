@@ -4,13 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="add authorize to endpoints and delete item endpoint">
-      <change afterPath="$PROJECT_DIR$/app/services/session_analytics.py" afterDir="false" />
+    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="fix performance overview Endpoint">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/activities.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/activities.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/api/analytics.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/analytics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/schemas/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/schemas/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/schemas/therapy_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/schemas/therapy_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/openai_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/openai_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/speech_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/speech_processing.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/activity_category.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/activity_category.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/activity_item.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/activity_item.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/performance.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/performance.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/progress_tracker.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/progress_tracker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/recommender.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/recommender.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/whisper_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/whisper_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,7 +79,8 @@
       <workItem from="1745528602746" duration="1134000" />
       <workItem from="1745529802996" duration="5726000" />
       <workItem from="1745615387210" duration="33000" />
-      <workItem from="1745657612324" duration="45508000" />
+      <workItem from="1745657612324" duration="62298000" />
+      <workItem from="1746138369807" duration="19791000" />
     </task>
     <task id="LOCAL-00001" summary="Asd Speech therapy backend">
       <option name="closed" value="true" />
@@ -108,7 +114,23 @@
       <option name="project" value="LOCAL" />
       <updated>1745873727393</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="add session overview endpoint">
+      <option name="closed" value="true" />
+      <created>1745958647122</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1745958647122</updated>
+    </task>
+    <task id="LOCAL-00006" summary="fix performance overview Endpoint">
+      <option name="closed" value="true" />
+      <created>1746564751804</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1746564751804</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -119,6 +141,8 @@
     <MESSAGE value="feat: websocket connection" />
     <MESSAGE value="add authorize to endpoints" />
     <MESSAGE value="add authorize to endpoints and delete item endpoint" />
-    <option name="LAST_COMMIT_MESSAGE" value="add authorize to endpoints and delete item endpoint" />
+    <MESSAGE value="add session overview endpoint" />
+    <MESSAGE value="fix performance overview Endpoint" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix performance overview Endpoint" />
   </component>
 </project>

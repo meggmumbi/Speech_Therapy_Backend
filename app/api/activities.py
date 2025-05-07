@@ -1,3 +1,5 @@
+import random as rd
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -213,3 +215,50 @@ async def record_response(
     db.refresh(db_response)
 
     return {"status": "success", "activity_id": db_response.id}
+
+
+@router.get("/sessions/{session_id}/selection-options/{item_id}", response_model=List[str])
+def get_selection_options(
+        session_id: uuid.UUID,
+        item_id: uuid.UUID,
+        db: Session = Depends(get_db)
+):
+    """
+    Get selection options for non-verbal response
+    - Returns 4 items from the same category (including the correct one)
+    - If category has <4 items, returns all available items
+    - Correct item is always included
+    - Options are shuffled randomly
+    """
+    # Get current item and its category
+    current_item = db.query(models.ActivityItem) \
+        .filter(models.ActivityItem.id == item_id) \
+        .first()
+
+    if not current_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Get all items from the same category
+    category_items = db.query(models.ActivityItem) \
+        .filter(
+        models.ActivityItem.category_id == current_item.category_id,
+        models.ActivityItem.id != item_id  # Exclude current item initially
+    ) \
+        .all()
+
+    # Prepare options (always include current item)
+    options = [current_item.name]
+
+    # Add other items from category
+    other_items = [item.name for item in category_items]
+
+    # If we have enough items for selection
+    if len(other_items) >= 3:
+        options.extend(rd.sample(other_items, 3))  # Using the rd alias
+    else:
+        options.extend(other_items)  # Add all available items
+
+    # Shuffle the options using the alias
+    rd.shuffle(options)
+
+    return options
