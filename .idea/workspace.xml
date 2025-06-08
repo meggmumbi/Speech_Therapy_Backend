@@ -4,18 +4,24 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="fix performance overview Endpoint">
+    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="fix Analytics endpoint">
+      <change afterPath="$PROJECT_DIR$/app/models/LearningPath.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/schemas/personalization.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/personalization.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/recommendation_engine.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/api/activities.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/activities.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/api/analytics.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/analytics.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/children.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/children.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/feedback.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/feedback.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/api/speech_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/speech_processing.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/activity_category.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/activity_category.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/activity_item.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/activity_item.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/performance.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/performance.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/progress_tracker.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/progress_tracker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/recommender.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/recommender.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/whisper_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/whisper_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/feedback.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/feedback.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/schemas/feedback.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/schemas/feedback.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/performance_updater.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/performance_updater.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/pronunciation_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/pronunciation_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -80,7 +86,8 @@
       <workItem from="1745529802996" duration="5726000" />
       <workItem from="1745615387210" duration="33000" />
       <workItem from="1745657612324" duration="62298000" />
-      <workItem from="1746138369807" duration="19791000" />
+      <workItem from="1746138369807" duration="73391000" />
+      <workItem from="1749210724912" duration="17068000" />
     </task>
     <task id="LOCAL-00001" summary="Asd Speech therapy backend">
       <option name="closed" value="true" />
@@ -130,7 +137,15 @@
       <option name="project" value="LOCAL" />
       <updated>1746564751804</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="fix Analytics endpoint">
+      <option name="closed" value="true" />
+      <created>1746651563578</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1746651563578</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -143,6 +158,7 @@
     <MESSAGE value="add authorize to endpoints and delete item endpoint" />
     <MESSAGE value="add session overview endpoint" />
     <MESSAGE value="fix performance overview Endpoint" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix performance overview Endpoint" />
+    <MESSAGE value="fix Analytics endpoint" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix Analytics endpoint" />
   </component>
 </project>

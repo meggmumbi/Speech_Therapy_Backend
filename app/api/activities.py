@@ -7,14 +7,17 @@ import uuid
 from datetime import datetime
 
 from .. import models
-from ..models import Caregiver
+from ..models import Caregiver, TherapySession
 from ..schemas import (
     activity_category,
     activity_item,
     therapy_session
 )
+from ..schemas.personalization import AdaptationSchema
 from ..schemas.session_activity import SessionActivityCreate
 from ..database import get_db
+from ..services.personalization import PersonalizationEngine
+from ..services.recommendation_engine import RecommendationEngine
 from ..utils.openai_utils import generate_image, generate_pronunciation_audio, download_image
 from ..utils.auth import get_current_user
 
@@ -262,3 +265,41 @@ def get_selection_options(
     rd.shuffle(options)
 
     return options
+
+@router.post("/sessions/adaptive")
+def create_adaptive_session(
+    child_id: uuid.UUID,
+    caregiver_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    engine = RecommendationEngine(db)
+    return engine.generate_adaptive_session(child_id, caregiver_id)
+
+@router.post("/sessions/{session_id}/adapt")
+def adapt_session(session_id: uuid.UUID, db: Session = Depends(get_db)):
+    engine = RecommendationEngine(db)
+    return engine.update_session_adaptively(session_id)
+
+
+@router.get("/sessions/{session_id}/next-activity")
+def get_next_activity(session_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Get the next recommended activity for a session"""
+    session = db.query(TherapySession).get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    engine = PersonalizationEngine(db)
+    next_activity = engine.select_next_activity(session)
+    if not next_activity:
+        raise HTTPException(status_code=404, detail="No suitable activity found")
+
+    return next_activity
+
+
+@router.get("/sessions/{session_id}/adapt", response_model=AdaptationSchema)
+def get_adaptation(session_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Get real-time adaptation recommendations"""
+    session = db.query(TherapySession).get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return adapt_session(session_id, db)

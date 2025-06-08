@@ -11,7 +11,7 @@ from datetime import datetime
 from numba.core.cgutils import printf
 
 from ..services.whisper_service import transcribe_audio, validate_audio_file
-from ..services.pronunciation_analysis import analyze_pronunciation
+from ..services.pronunciation_analysis import analyze_pronunciation, detect_stuttering, detect_echolalia
 from ..database import get_db
 from sqlalchemy.orm import Session
 from ..models import SessionActivity, TherapySession, ActivityItem
@@ -23,6 +23,7 @@ router = APIRouter(tags=["speech_processing"])
 async def process_audio_response(
         session_id: uuid.UUID,
         item_id: uuid.UUID,
+        response_time_seconds: float,
         audio_file: UploadFile = File(...),
         db: Session = Depends(get_db)
 ):
@@ -41,11 +42,14 @@ async def process_audio_response(
             raise HTTPException(status_code=404, detail="Activity item not found")
 
         analysis = analyze_pronunciation(item.name, transcription)
+        is_stuttering = detect_stuttering(transcription)
+        is_echolalia = detect_echolalia(item.name, transcription)
 
         # 3. Store results
         activity = SessionActivity(
             session_id=session_id,
             item_id=item_id,
+            response_time_seconds=response_time_seconds,
             response_type="verbal",
             response_text=transcription,
             is_correct=analysis["is_correct"],
@@ -62,7 +66,9 @@ async def process_audio_response(
         return {
             "transcription": transcription,
             "analysis": analysis,
-            "activity_id": str(activity.id)
+            "activity_id": str(activity.id),
+            "stuttering": is_stuttering,
+            "echolalia": is_echolalia
         }
 
     except HTTPException as he:

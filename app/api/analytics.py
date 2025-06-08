@@ -6,7 +6,7 @@ from typing import List
 from .. import schemas, models
 from ..services import performance_updater, Recommender, ProgressTracker
 from ..database import get_db
-from ..models import TherapySession, SessionActivity, ChildPerformance, Caregiver
+from ..models import TherapySession, SessionActivity, ChildPerformance, Caregiver, CaregiverFeedback
 from ..services.session_analytics import SessionAnalytics
 from ..utils.auth import get_current_user
 
@@ -16,7 +16,9 @@ router = APIRouter(tags=["analytics"])
 @router.get("/children/{child_id}/progress")
 def get_child_progress(
         child_id: uuid.UUID,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+
+
 ):
     # Verify child exists
     child = db.query(models.Child).filter(models.Child.id == child_id).first()
@@ -51,14 +53,23 @@ def get_session_history(
         child_id: uuid.UUID,
         limit: int = 10,
         db: Session = Depends(get_db),
-current_user: Caregiver = Depends(get_current_user)
+        current_user: models.Caregiver = Depends(get_current_user)
 ):
+    # Query therapy sessions
     sessions = db.query(TherapySession).filter(
         TherapySession.child_id == child_id
     ).order_by(TherapySession.start_time.desc()).limit(limit).all()
 
-    return [
-        {
+    session_history = []
+
+    for session in sessions:
+        # Query caregiver feedback for this session
+        feedback = db.query(CaregiverFeedback).filter(
+            CaregiverFeedback.session_id == session.id
+        ).first()
+
+        # Build session data
+        session_data = {
             "id": str(session.id),
             "date": session.start_time.date(),
             "category": session.category.name,
@@ -66,13 +77,27 @@ current_user: Caregiver = Depends(get_current_user)
                 (session.end_time - session.start_time).total_seconds() / 60
                 if session.end_time else None
             ),
-            "score": sum(
-                a.pronunciation_score for a in session.activities
-                if a.pronunciation_score is not None
-            ) / len(session.activities) if session.activities else 0
+            "score": (
+                    sum(1 for a in session.activities if a.is_correct) / len(session.activities)
+                ) if session.activities else 0,
+            "feedback": None
         }
-        for session in sessions
-    ]
+
+        # Add feedback if exists
+        if feedback:
+            session_data["feedback"] = {
+                "rating": feedback.rating,
+                "comments": feedback.comments,
+                "progress_achievements": feedback.progress_achievements,
+                "areas_for_improvement": feedback.areas_for_improvement,
+                "behavioral_observations": feedback.behavioral_observations,
+                "feedback_type": feedback.feedback_type,
+                "created_at": feedback.created_at.isoformat() if feedback.created_at else None
+            }
+
+        session_history.append(session_data)
+
+    return session_history
 
 
 @router.get("/children/{child_id}/performance-details")
@@ -113,7 +138,7 @@ def get_performance_details(
 def get_progress_trends(
     child_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: models.Caregiver = Depends(get_current_user)
+
 ):
     try:
         tracker = ProgressTracker(db)

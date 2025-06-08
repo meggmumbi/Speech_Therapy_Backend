@@ -18,8 +18,8 @@ def update_performance_metrics(db: Session, child_id: uuid.UUID, category_id: uu
     # Calculate metrics
     verbal_attempts = sum(1 for a in activities if a.response_type == "verbal")
     verbal_success = sum(1 for a in activities if a.response_type == "verbal" and a.is_correct)
-    selection_attempts = sum(1 for a in activities if a.response_type == "select")
-    selection_success = sum(1 for a in activities if a.response_type == "select" and a.is_correct)
+    selection_attempts = sum(1 for a in activities if a.response_type == "nonverbal")
+    selection_success = sum(1 for a in activities if a.response_type == "nonverbal" and a.is_correct)
 
     # Calculate overall score (weighted average)
     total_attempts = verbal_attempts + selection_attempts
