@@ -6,6 +6,7 @@ import uuid
 class ActivityCategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
+    type: Optional[str] = None
     difficulty_level: str  # 'easy', 'medium', 'hard'
 
 

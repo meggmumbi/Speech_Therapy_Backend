@@ -5,8 +5,10 @@ import uuid
 
 class ActivityItemBase(BaseModel):
     name: str
+    description: str
     category_id: uuid.UUID
     difficulty_level: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class ActivityItemCreate(ActivityItemBase):

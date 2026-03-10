@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from sqlalchemy.orm import Session
@@ -7,7 +7,7 @@ from starlette import status
 from ..schemas.caregiver import CaregiverCreate
 from ..models.caregiver import Caregiver
 from ..database import get_db
-from ..utils.auth import get_password_hash, create_access_token, verify_password
+from ..utils.auth import get_password_hash, create_access_token, verify_password, blacklist_token
 
 router = APIRouter()
 
@@ -45,3 +45,20 @@ def login(
 
     access_token = create_access_token(data={"sub": caregiver.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+def logout(authorization: str = Header(...), db: Session = Depends(get_db)):
+    """
+    Logout endpoint - blacklists the current token
+    """
+    try:
+        # Extract token from Bearer header
+        token = authorization.replace("Bearer ", "")
+
+        # Add token to blacklist
+        blacklist_token(token, db)
+
+        return {"message": "Successfully logged out"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Logout failed")

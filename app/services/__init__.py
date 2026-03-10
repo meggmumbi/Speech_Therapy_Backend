@@ -1,3 +1,4 @@
+from .pronunciation_pipeline import analyse_pronunciation
 from .recommender import Recommender
 from .progress_tracker import ProgressTracker
 from .pronunciation_analysis import analyze_pronunciation
@@ -7,5 +8,6 @@ __all__ = [
     'Recommender',
     'ProgressTracker',
     'analyze_pronunciation',
-    'transcribe_audio'
+    'transcribe_audio',
+    'analyse_pronunciation'
 ]

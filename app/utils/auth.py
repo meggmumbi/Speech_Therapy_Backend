@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import os
 from dotenv import load_dotenv
-from ..models import Caregiver
+from ..models import Caregiver, TokenBlacklist
 from ..database import get_db
 
 load_dotenv()
@@ -37,6 +37,14 @@ async def get_current_user(
         token: str = Depends(oauth2_scheme),
         db: Session = Depends(get_db)
 ):
+    # Check if token is blacklisted
+    if is_token_blacklisted(token, db):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been invalidated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -54,3 +62,26 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+def blacklist_token(token: str, db: Session):
+    """Add token to blacklist"""
+    try:
+        # Decode token to get expiration
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        exp = datetime.fromtimestamp(payload.get("exp"))
+
+        blacklisted = TokenBlacklist(
+            token=token,
+            expires_at=exp
+        )
+        db.add(blacklisted)
+        db.commit()
+    except JWTError:
+        # Token is invalid anyway
+        pass
+
+
+def is_token_blacklisted(token: str, db: Session) -> bool:
+    """Check if token is blacklisted"""
+    return db.query(TokenBlacklist).filter(TokenBlacklist.token == token).first() is not None

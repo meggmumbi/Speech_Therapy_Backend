@@ -1,9 +1,13 @@
 import uuid
 
+from sqlalchemy import func, case, literal, and_, exists, distinct
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from typing import Dict, List, Set
+
+from .. import models
 from ..models import TherapySession, SessionActivity, ActivityItem
+from ..models.child import child_category_association
 
 
 class SessionAnalytics:
@@ -118,3 +122,209 @@ class SessionAnalytics:
                 recommendations.append("Focus on 2-3 items at a time for better retention")
 
         return recommendations
+
+    def get_child_categories_with_stats(self, child_id: uuid.UUID):
+        # Get the child's selected categories with their order
+        child_interests = (
+            self.db.query(
+                models.ActivityCategory.id.label('category_id'),
+                literal(True).label('is_selected')  # Mark as selected
+            )
+            .join(child_category_association,
+                  models.ActivityCategory.id == child_category_association.c.category_id)
+            .filter(child_category_association.c.child_id == child_id)
+            .filter(models.ActivityCategory.type == 'personalized')
+            .subquery()
+        )
+
+
+
+        # Get all categories with selection status
+        all_categories = (
+            self.db.query(
+                models.ActivityCategory.id,
+                models.ActivityCategory.name,
+                models.ActivityCategory.description,
+                models.ActivityCategory.difficulty_level,
+                models.ActivityCategory.type,
+                # Use a fixed display order - selected categories first
+                case(
+                    (child_interests.c.category_id.isnot(None), True),
+                    else_=False
+                ).label('is_selected'),
+                # Display priority - selected first (1), others later (2)
+                case(
+                    (child_interests.c.category_id.isnot(None), 1),
+                    else_=2
+                ).label('display_priority')
+            )
+            .filter(models.ActivityCategory.type == 'personalized')
+            .outerjoin(child_interests, models.ActivityCategory.id == child_interests.c.category_id)
+            .subquery()
+        )
+
+        # Count items in each category
+        item_counts = (
+            self.db.query(
+                models.ActivityItem.category_id,
+                func.count(models.ActivityItem.id).label('item_count')
+            )
+            .join(models.ActivityCategory, models.ActivityItem.category_id == models.ActivityCategory.id)
+            .filter(models.ActivityCategory.type == 'personalized')
+            .group_by(models.ActivityItem.category_id)
+            .subquery()
+        )
+
+
+        # Get aggregated session attempts data
+        category_attempts = (
+            self.db.query(
+                models.ActivityItem.category_id,
+                func.count(models.SessionActivity.id).label('total_item_attempts'),
+                func.count(distinct(models.TherapySession.id)).label('total_attempts'),
+                func.sum(case((models.SessionActivity.is_correct == True, 1), else_=0)).label('correct_attempts'),
+                func.max(models.SessionActivity.created_at).label('last_attempt_date'),
+            )
+            .join(models.ActivityItem, models.SessionActivity.item_id == models.ActivityItem.id)
+            .join(models.TherapySession, models.SessionActivity.session_id == models.TherapySession.id)
+            .filter(models.TherapySession.child_id == child_id)
+            .filter(models.ActivityCategory.type == 'personalized')
+            .group_by(models.ActivityItem.category_id)
+            .subquery()
+        )
+
+        # Final query combining all data
+        results = (
+            self.db.query(
+                all_categories.c.id.label('id'),
+                all_categories.c.name,
+                all_categories.c.description,
+                all_categories.c.difficulty_level,
+                all_categories.c.is_selected,
+                func.coalesce(item_counts.c.item_count, 0).label('item_count'),
+                func.coalesce(category_attempts.c.total_attempts, 0).label('total_attempts'),
+                case(
+                    (func.coalesce(category_attempts.c.total_item_attempts, 0) > 0,
+                     (func.coalesce(category_attempts.c.correct_attempts, 0) /
+                      func.coalesce(category_attempts.c.total_item_attempts, 1)) * 100),
+                    else_=None
+                ).label('latest_performance'),
+                category_attempts.c.last_attempt_date,
+                case(
+                    (all_categories.c.is_selected == True, 1),
+                    else_=2
+                ).label('child_interest_order')
+            )
+            .outerjoin(item_counts, all_categories.c.id == item_counts.c.category_id)
+            .outerjoin(category_attempts, all_categories.c.id == category_attempts.c.category_id)
+            .order_by(
+                all_categories.c.display_priority.asc(),
+                all_categories.c.name.asc()
+            )
+            .all()
+        )
+
+        return results
+
+    def get_generic_child_categories_with_stats(self, child_id: uuid.UUID):
+        # Get the child's selected categories with their order
+        child_interests = (
+            self.db.query(
+                models.ActivityCategory.id.label('category_id'),
+                literal(True).label('is_selected')  # Mark as selected
+            )
+            .join(child_category_association,
+                  models.ActivityCategory.id == child_category_association.c.category_id)
+            .filter(child_category_association.c.child_id == child_id)
+            .filter(models.ActivityCategory.type == 'generic')
+            .subquery()
+        )
+
+
+
+        # Get all categories with selection status
+        all_categories = (
+            self.db.query(
+                models.ActivityCategory.id,
+                models.ActivityCategory.name,
+                models.ActivityCategory.description,
+                models.ActivityCategory.difficulty_level,
+                models.ActivityCategory.type,
+                # Use a fixed display order - selected categories first
+                case(
+                    (child_interests.c.category_id.isnot(None), True),
+                    else_=False
+                ).label('is_selected'),
+                # Display priority - selected first (1), others later (2)
+                case(
+                    (child_interests.c.category_id.isnot(None), 1),
+                    else_=2
+                ).label('display_priority')
+            )
+            .filter(models.ActivityCategory.type == 'generic')
+            .outerjoin(child_interests, models.ActivityCategory.id == child_interests.c.category_id)
+            .subquery()
+        )
+
+        # Count items in each category
+        item_counts = (
+            self.db.query(
+                models.ActivityItem.category_id,
+                func.count(models.ActivityItem.id).label('item_count')
+            )
+            .join(models.ActivityCategory, models.ActivityItem.category_id == models.ActivityCategory.id)
+            .filter(models.ActivityCategory.type == 'generic')
+            .group_by(models.ActivityItem.category_id)
+            .subquery()
+        )
+
+
+        # Get aggregated session attempts data
+        category_attempts = (
+            self.db.query(
+                models.ActivityItem.category_id,
+                func.count(models.SessionActivity.id).label('total_item_attempts'),
+                func.count(distinct(models.TherapySession.id)).label('total_attempts'),
+                func.sum(case((models.SessionActivity.is_correct == True, 1), else_=0)).label('correct_attempts'),
+                func.max(models.SessionActivity.created_at).label('last_attempt_date'),
+            )
+            .join(models.ActivityItem, models.SessionActivity.item_id == models.ActivityItem.id)
+            .join(models.TherapySession, models.SessionActivity.session_id == models.TherapySession.id)
+            .filter(models.TherapySession.child_id == child_id)
+            .filter(models.ActivityCategory.type == 'generic')
+            .group_by(models.ActivityItem.category_id)
+            .subquery()
+        )
+
+        # Final query combining all data
+        results = (
+            self.db.query(
+                all_categories.c.id.label('id'),
+                all_categories.c.name,
+                all_categories.c.description,
+                all_categories.c.difficulty_level,
+                all_categories.c.is_selected,
+                func.coalesce(item_counts.c.item_count, 0).label('item_count'),
+                func.coalesce(category_attempts.c.total_attempts, 0).label('total_attempts'),
+                case(
+                    (func.coalesce(category_attempts.c.total_item_attempts, 0) > 0,
+                     (func.coalesce(category_attempts.c.correct_attempts, 0) /
+                      func.coalesce(category_attempts.c.total_item_attempts, 1)) * 100),
+                    else_=None
+                ).label('latest_performance'),
+                category_attempts.c.last_attempt_date,
+                case(
+                    (all_categories.c.is_selected == True, 1),
+                    else_=2
+                ).label('child_interest_order')
+            )
+            .outerjoin(item_counts, all_categories.c.id == item_counts.c.category_id)
+            .outerjoin(category_attempts, all_categories.c.id == category_attempts.c.category_id)
+            .order_by(
+                all_categories.c.display_priority.asc(),
+                all_categories.c.name.asc()
+            )
+            .all()
+        )
+
+        return results

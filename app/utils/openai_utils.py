@@ -39,8 +39,8 @@ async def generate_image(prompt: str):
         # Generate image using the already initialized client
         response = client.images.generate(
             model="dall-e-3",
-            prompt=f"generate an image of {prompt} "
-                   f"The image should be friendly to children with ASD",
+            prompt=f"generate a single image of {prompt}",
+
             n=1,
             size="1024x1024"
         )

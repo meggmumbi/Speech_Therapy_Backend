@@ -7,6 +7,8 @@ from .session_activity import SessionActivity
 from .feedback import CaregiverFeedback
 from .performance import ChildPerformance
 from .LearningPath import LearningPath
-
+from .ChildCategoryDisplay import ChildCategoryDisplay
+from .GazeTrackingData import GazeTrackingData
+from .token_blacklist import TokenBlacklist
 
 

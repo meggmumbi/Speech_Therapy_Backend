@@ -6,7 +6,7 @@ from typing import List
 import uuid
 from datetime import datetime
 
-from .. import models
+from .. import models, schemas
 from ..models import Caregiver, TherapySession
 from ..schemas import (
     activity_category,
@@ -18,6 +18,7 @@ from ..schemas.session_activity import SessionActivityCreate
 from ..database import get_db
 from ..services.personalization import PersonalizationEngine
 from ..services.recommendation_engine import RecommendationEngine
+from ..services.session_analytics import SessionAnalytics
 from ..utils.openai_utils import generate_image, generate_pronunciation_audio, download_image
 from ..utils.auth import get_current_user
 
@@ -38,10 +39,57 @@ async def create_category(
     db.refresh(db_category)
     return db_category
 
+@router.post("/generic/categories/", response_model=activity_category.ActivityCategory)
+async def create_category(
+        category: activity_category.ActivityCategoryCreate,
+        db: Session = Depends(get_db),
+        current_user: Caregiver = Depends(get_current_user)
+):
+    db_category = models.ActivityCategory(**category.dict())
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
 
 @router.get("/categories/", response_model=List[activity_category.ActivityCategory])
 def list_categories(db: Session = Depends(get_db),current_user: Caregiver = Depends(get_current_user)):
-    return db.query(models.ActivityCategory).all()
+    return (
+        db.query(models.ActivityCategory)
+        .filter(models.ActivityCategory.type == "personalized")
+        .all()
+    )
+
+
+@router.get("/{child_id}/categories-with-stats", response_model=List[schemas.ChildCategoryDisplay])
+def get_child_categories_with_stats(
+        child_id: uuid.UUID,
+        db: Session = Depends(get_db),
+
+):
+    # Verify child exists and user has access
+    child = db.query(models.Child).filter(models.Child.id == child_id).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    analyzer = SessionAnalytics(db)
+    categories_with_stats = analyzer.get_child_categories_with_stats(child_id)
+    return categories_with_stats
+
+@router.get("/{child_id}/generic/categories-with-stats", response_model=List[schemas.ChildCategoryDisplay])
+def get_child_categories_with_stats(
+        child_id: uuid.UUID,
+        db: Session = Depends(get_db),
+
+):
+    # Verify child exists and user has access
+    child = db.query(models.Child).filter(models.Child.id == child_id).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    analyzer = SessionAnalytics(db)
+    categories_with_stats = analyzer.get_generic_child_categories_with_stats(child_id)
+    return categories_with_stats
 
 
 # Activity Items CRUD
@@ -49,7 +97,7 @@ def list_categories(db: Session = Depends(get_db),current_user: Caregiver = Depe
 async def create_item(
         item: activity_item.ActivityItemCreate,
         db: Session = Depends(get_db),
-        current_user: models.Caregiver = Depends(get_current_user)
+
 ):
     # Create base item
     db_item = models.ActivityItem(**item.dict(exclude={"generate_image"}))
@@ -183,6 +231,7 @@ async def get_next_item(
     return {
         "item_id": next_item.id,
         "name": next_item.name,
+        "description": next_item.description,
         "image_url": next_item.image_url,
         "audio_url": next_item.audio_url
     }
@@ -303,3 +352,59 @@ def get_adaptation(session_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     return adapt_session(session_id, db)
+
+
+@router.post("/tracking/", response_model=schemas.GazeTrackingData)
+async def save_gaze_tracking_data(
+        gaze_data: schemas.GazeTrackingDataCreate,
+        db: Session = Depends(get_db),
+        current_user: models.Caregiver = Depends(get_current_user)
+):
+    print("Received gaze data:", gaze_data)
+    # Verify session exists and belongs to current user
+    session = db.query(models.TherapySession).filter(
+        models.TherapySession.id == gaze_data.session_id,
+        models.TherapySession.caregiver_id == current_user.id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Therapy session not found")
+
+    # Verify child exists and belongs to current user
+    child = db.query(models.Child).filter(
+        models.Child.id == gaze_data.child_id
+    ).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    # Create gaze tracking data record
+    db_gaze_data = models.GazeTrackingData(**gaze_data.dict())
+    db.add(db_gaze_data)
+    db.commit()
+    db.refresh(db_gaze_data)
+
+    # Update session with gaze tracking reference if needed
+    # You might want to add a field in TherapySession to track if gaze data exists
+
+    return db_gaze_data
+
+
+@router.get("/sessions/{session_id}/tracking/", response_model=List[schemas.GazeTrackingData])
+async def get_gaze_tracking_data(
+        session_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.Caregiver = Depends(get_current_user)
+):
+    # Verify session belongs to current user
+    session = db.query(models.TherapySession).filter(
+        models.TherapySession.id == session_id,
+        models.TherapySession.caregiver_id == current_user.id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Therapy session not found")
+
+    # Get all gaze tracking data for this session
+    gaze_data = db.query(models.GazeTrackingData).filter(
+        models.GazeTrackingData.session_id == session_id
+    ).all()
+
+    return gaze_data
