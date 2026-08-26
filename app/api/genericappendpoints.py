@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime
 from http.client import HTTPException
@@ -80,7 +81,10 @@ async def process_transcription_response(
         current_attempt_number = len(previous_attempts) + 1
 
         # Compare transcription with item name to determine correctness
-        is_correct = transcription.strip().lower() == item.name.strip().lower()
+        is_correct = (
+                normalize_for_comparison(transcription)
+                == normalize_for_comparison(item.name)
+        )
 
         # Generate feedback based on correctness
         if is_correct:
@@ -136,3 +140,10 @@ async def process_transcription_response(
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Processing failed: {str(e)}")
+
+
+def normalize_for_comparison(text):
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()

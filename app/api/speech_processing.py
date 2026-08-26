@@ -159,6 +159,8 @@ async def process_transcription_response(
 
         # Enhanced analysis that handles both words and sentences
         analysis = analyse_pronunciation(str(item.name), transcription)
+        print("analysis", analysis)
+
         stuttering_analysis = detect_stuttering(transcription)
         is_echolalia = detect_echolalia(str(item.name), transcription)
 
@@ -170,11 +172,12 @@ async def process_transcription_response(
             response_time_seconds=response_time_seconds,
             response_type="verbal",
             response_text=transcription,
-            is_correct=analysis["is_correct"],
-            pronunciation_score=analysis["similarity_score"],
-            feedback=analysis["feedback"],
-            error_type=analysis["error_type"],
-            substitutions=analysis["substitutions"],
+            is_correct=analysis.get("is_correct", False),
+            pronunciation_score=analysis.get("similarity_score", 0),
+            feedback=analysis.get("feedback", ""),
+            error_type = analysis.get("error_type"),
+
+            substitutions=analysis.get("substitutions", []),
             repetition_count=stuttering_analysis["repetition_count"],
             stammering_detected=stuttering_analysis["has_stammering"],
             word_analysis=analysis.get("word_analysis", []),

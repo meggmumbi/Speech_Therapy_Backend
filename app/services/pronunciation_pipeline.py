@@ -1,7 +1,10 @@
+import re
+
 import Levenshtein
 from metaphone import doublemetaphone
 from g2p_en import G2p
 import nltk
+from num2words import num2words
 
 nltk.download('averaged_perceptron_tagger_eng')
 
@@ -28,7 +31,23 @@ KENYAN_PRONUNCIATION_PATTERNS = {
 # ------------------------------------------------
 
 def normalize_text(text):
-    return text.lower().strip()
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)
+
+    words = text.split()
+    normalized_words = []
+
+    for word in words:
+        if word.isdigit():
+            try:
+                normalized_words.append(num2words(int(word)))
+            except:
+                normalized_words.append(word)
+        else:
+            normalized_words.append(word)
+
+    return " ".join(normalized_words).strip()
+
 
 
 # ------------------------------------------------
@@ -93,12 +112,14 @@ def detect_phoneme_errors(expected_word, actual_word):
 
     errors = []
 
+    # If identical → no errors
+    if expected_ph == actual_ph:
+        return errors
+
     min_len = min(len(expected_ph), len(actual_ph))
 
     for i in range(min_len):
-
         if expected_ph[i] != actual_ph[i]:
-
             errors.append({
                 "position": i,
                 "expected": expected_ph[i],
@@ -114,10 +135,13 @@ def detect_phoneme_errors(expected_word, actual_word):
 
 def phonetic_similarity(expected, actual):
 
-    exp_meta = doublemetaphone(expected)[0]
-    act_meta = doublemetaphone(actual)[0]
+    expected_ph = get_phonemes(expected)
+    actual_ph = get_phonemes(actual)
 
-    return exp_meta == act_meta
+    if not expected_ph or not actual_ph:
+        return False
+
+    return expected_ph == actual_ph
 
 
 # ------------------------------------------------
@@ -126,12 +150,18 @@ def phonetic_similarity(expected, actual):
 
 def classify_error(similarity, phonetic_match, phoneme_errors):
 
+    if phonetic_match and not phoneme_errors:
+        return "correct"
+
+    # Exact match (safe fallback)
     if similarity == 1:
         return "correct"
 
+    # Minor pronunciation issues
     if phoneme_errors and phonetic_match:
         return "minor_pronunciation_error"
 
+    # Close attempt
     if similarity > 0.7:
         return "close_pronunciation"
 
@@ -202,6 +232,10 @@ def analyze_word(expected_word, actual_word):
 
     phoneme_errors = detect_phoneme_errors(expected_word, actual_word)
 
+    if phonetic_match and not phoneme_errors:
+        substitutions = []
+        similarity = 1.0
+
     error_type = classify_error(similarity, phonetic_match, phoneme_errors)
 
     feedback = generate_feedback(
@@ -228,31 +262,128 @@ def analyze_word(expected_word, actual_word):
 # ------------------------------------------------
 # SENTENCE LEVEL ANALYSIS
 # ------------------------------------------------
+def generate_sentence_feedback(word_analysis, expected_sentence):
+    """
+    Generate comprehensive feedback for sentence pronunciation
+    """
+    correct_words = [w for w in word_analysis if w["is_correct"]]
+    incorrect_words = [w for w in word_analysis if not w["is_correct"]]
+
+    total_words = len(word_analysis)
+    correct_count = len(correct_words)
+
+    # If all words are correct
+    if correct_count == total_words:
+        return "Excellent! You pronounced the entire sentence correctly!"
+
+    # Build feedback for incorrect words
+    if incorrect_words:
+        # Get unique incorrect words with their issues
+        word_feedback = []
+        for word_result in incorrect_words:
+            expected = word_result["expected"]
+            actual = word_result["actual"]
+            error_type = word_result["error_type"]
+
+            if error_type == "close_pronunciation":
+                word_feedback.append(f"'{expected}' (you said '{actual}' - close!)")
+            else:
+                word_feedback.append(f"'{expected}' (you said '{actual}')")
+
+        # Create feedback message
+        if len(word_feedback) == 1:
+            wrong_words_text = word_feedback[0]
+            feedback = f"Good try! Let's practice {wrong_words_text} again."
+        else:
+            # Join with commas and 'and' for the last item
+            if len(word_feedback) > 1:
+                wrong_words_text = ", ".join(word_feedback[:-1]) + f" and {word_feedback[-1]}"
+            else:
+                wrong_words_text = word_feedback[0]
+
+            feedback = f"Good effort! Pay attention to {wrong_words_text}. Let's practice these words."
+
+        # Add encouragement based on progress
+        if correct_count > total_words / 2:
+            feedback = f"You got {correct_count} out of {total_words} words correct! " + feedback
+        else:
+            feedback = f"You correctly said {correct_count} words. " + feedback
+
+        return feedback
+
+    return "Let's practice the entire sentence again."
+
 
 def analyze_sentence(expected_sentence, actual_sentence):
-
+    """
+    Analyze sentence pronunciation with detailed word-by-word comparison
+    """
     expected_words = normalize_text(expected_sentence).split()
     actual_words = normalize_text(actual_sentence).split()
 
     results = []
 
-    min_len = min(len(expected_words), len(actual_words))
+    # Handle cases where user says more or fewer words
+    max_len = max(len(expected_words), len(actual_words))
 
-    for i in range(min_len):
+    for i in range(max_len):
+        if i < len(expected_words) and i < len(actual_words):
+            # Both expected and actual words exist
+            word_result = analyze_word(expected_words[i], actual_words[i])
 
-        word_result = analyze_word(
-            expected_words[i],
-            actual_words[i]
-        )
+            # Add position information for better tracking
+            word_result["position"] = i
+            word_result["expected_word"] = expected_words[i]
+            word_result["actual_word"] = actual_words[i]
 
-        results.append(word_result)
+            results.append(word_result)
+
+        elif i < len(expected_words):
+            # User missed a word (said fewer words)
+            results.append({
+                "expected": expected_words[i],
+                "actual": "[missing]",
+                "similarity_score": 0.0,
+                "phonetic_match": False,
+                "phoneme_errors": [],
+                "substitutions": [],
+                "error_type": "missing_word",
+                "feedback": f"You missed the word '{expected_words[i]}'",
+                "is_correct": False,
+                "position": i,
+                "expected_word": expected_words[i],
+                "actual_word": None
+            })
+        else:
+            # User added extra words
+            results.append({
+                "expected": "[unexpected]",
+                "actual": actual_words[i],
+                "similarity_score": 0.0,
+                "phonetic_match": False,
+                "phoneme_errors": [],
+                "substitutions": [],
+                "error_type": "extra_word",
+                "feedback": f"You added an extra word '{actual_words[i]}'",
+                "is_correct": False,
+                "position": i,
+                "expected_word": None,
+                "actual_word": actual_words[i]
+            })
 
     correct_count = sum(1 for r in results if r["is_correct"])
+    total_expected = len(expected_words)
+    similarity = correct_count / total_expected if total_expected > 0 else 0
+
+    # Generate appropriate feedback
+    feedback = generate_sentence_feedback(results, expected_sentence)
 
     return {
         "word_analysis": results,
         "correct_word_count": correct_count,
-        "total_word_count": len(expected_words)
+        "total_word_count": total_expected,
+        "similarity_score": round(similarity, 2),
+        "feedback": feedback
     }
 
 
@@ -261,22 +392,60 @@ def analyze_sentence(expected_sentence, actual_sentence):
 # ------------------------------------------------
 
 def analyse_pronunciation(expected, actual):
-
+    """
+    Main entry function for pronunciation analysis
+    """
     if len(expected.split()) > 1:
-
+        # Sentence analysis
         sentence_analysis = analyze_sentence(expected, actual)
 
-        similarity = sentence_analysis["correct_word_count"] / sentence_analysis["total_word_count"]
+        # Calculate if the entire sentence is correct
+        is_fully_correct = (
+                sentence_analysis["correct_word_count"] == sentence_analysis["total_word_count"]
+        )
+
+        # Collect all substitutions from incorrect words for error tracking
+        all_substitutions = []
+        for word_result in sentence_analysis["word_analysis"]:
+            if not word_result["is_correct"] and "substitutions" in word_result:
+                all_substitutions.extend(word_result["substitutions"])
 
         return {
-            "is_correct": similarity == 1,
-            "similarity_score": round(similarity, 2),
+            "is_correct": is_fully_correct,
+            "similarity_score": sentence_analysis["similarity_score"],
             "word_analysis": sentence_analysis["word_analysis"],
             "correct_word_count": sentence_analysis["correct_word_count"],
             "total_word_count": sentence_analysis["total_word_count"],
-            "feedback": "Let's practice the words again."
+            "error_type": "sentence_errors" if not is_fully_correct else "correct",
+            "substitutions": all_substitutions,
+            "feedback": sentence_analysis["feedback"],
+            # Add summary of incorrect words for quick reference
+            "incorrect_words": [
+                {
+                    "expected": w["expected"],
+                    "actual": w["actual"],
+                    "error_type": w["error_type"]
+                }
+                for w in sentence_analysis["word_analysis"]
+                if not w["is_correct"]
+            ]
         }
-
     else:
+        # Single word analysis
+        word_result = analyze_word(expected, actual)
 
-        return analyze_word(expected, actual)
+        # Add sentence-level fields for consistency
+        word_result["word_analysis"] = [word_result.copy()]
+        word_result["correct_word_count"] = 1 if word_result["is_correct"] else 0
+        word_result["total_word_count"] = 1
+        word_result["incorrect_words"] = [] if word_result["is_correct"] else [{
+            "expected": expected,
+            "actual": actual,
+            "error_type": word_result["error_type"]
+        }]
+
+        # Ensure error_type is set (should be from analyze_word, but just in case)
+        if "error_type" not in word_result:
+            word_result["error_type"] = "correct" if word_result["is_correct"] else "incorrect"
+
+        return word_result

@@ -24,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print(analyse_pronunciation("Which witch switched the Swiss wristwatches?", "Which witch shwitched the Shwiss wristwatches?"))
+print(analyse_pronunciation("slid", "slide"))
 
 
 app.include_router(ws_routes.router)

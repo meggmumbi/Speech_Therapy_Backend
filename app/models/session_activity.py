@@ -22,7 +22,7 @@ class SessionActivity(Base):
     pronunciation_score = Column(Float)
     response_time_seconds = Column(Float)
     # Enhanced error tracking for sentences
-    error_type = Column(String(20))  # 'repetition', 'stammering', 'substitution', 'sentence_errors', 'correct'
+    error_type = Column(String(300))  # 'repetition', 'stammering', 'substitution', 'sentence_errors', 'correct'
     substitutions = Column(JSON)  # Store specific sound substitutions
     repetition_count = Column(Integer, default=0)
     stammering_detected = Column(Boolean, default=False)
