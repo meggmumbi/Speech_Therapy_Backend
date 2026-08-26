@@ -4,14 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="Added personalization">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/genericappendpoints.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/genericappendpoints.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/speech_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/speech_processing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/session_activity.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/session_activity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/pronunciation_pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/pronunciation_pipeline.py" afterDir="false" />
-    </list>
+    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="Added personalization" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -93,6 +86,7 @@
       <workItem from="1767816979186" duration="89201000" />
       <workItem from="1779165835372" duration="2565000" />
       <workItem from="1779906331266" duration="2752000" />
+      <workItem from="1787732617256" duration="207000" />
     </task>
     <task id="LOCAL-00001" summary="Asd Speech therapy backend">
       <option name="closed" value="true" />
@@ -166,7 +160,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773148574193</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Added personalization">
+      <option name="closed" value="true" />
+      <created>1787732729716</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1787732729716</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
