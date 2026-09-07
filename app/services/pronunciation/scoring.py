@@ -39,8 +39,8 @@ from .align import (PhoneOp, align_phones, attach_phones, ctc_forced_align,
                     expand_spans)
 from .config import DEFAULT_CONFIG, PipelineConfig
 from .features import resolve_to_inventory, strip_stress
-from .gop import (PhoneScore, aggregate_score, compute_phone_scores,
-                  greedy_phone_decode, phone_posteriors,
+from .gop import (PhoneScore, aggregate_score, blank_weights,
+                  compute_phone_scores, greedy_phone_decode, phone_posteriors,
                   utterance_confidence, word_score)
 from .lexicon import ResourceUnavailable, normalize_text, pronunciations
 from .prosody import StressAnalysis, analyse_stress
@@ -120,6 +120,7 @@ def _score_variant(
     config: PipelineConfig,
     phone_log_probs: np.ndarray,
     phone_to_id: dict[str, int],
+    frame_weights: np.ndarray,
 ) -> tuple[float, list[PhoneScore], list, list[tuple[str, str]]] | None:
     """Forced-align and GOP-score one dictionary variant. None if unalignable.
 
@@ -145,6 +146,7 @@ def _score_variant(
     spans = expand_spans(spans, emissions.n_frames)
     phone_scores = compute_phone_scores(
         phone_log_probs, spans, list(variant), phone_to_id, config.gop_tau,
+        frame_weights=frame_weights,
     )
     return (
         word_score(phone_scores, config.duration_weighted_score),
@@ -308,7 +310,10 @@ def score_phone_sequence(
         # raw CTC matrix in which blank wins nearly every frame.
         phone_log_probs, phone_to_id, _ = phone_posteriors(
             emissions.log_probs, emissions.phone_to_id)
-        confidence = utterance_confidence(phone_log_probs)
+        # How much phone evidence each frame carries, from the FULL matrix --
+        # the blank column is gone from phone_log_probs by construction.
+        frame_weights = blank_weights(emissions.log_probs, emissions.blank_id)
+        confidence = utterance_confidence(phone_log_probs, frame_weights)
     if confidence < config.thresholds.confidence_gate:
         return _gated(target, "gated",
                       f"recogniser confidence {confidence:.2f} below gate",
@@ -318,7 +323,8 @@ def score_phone_sequence(
         best = None
         for variant in variants:
             scored = _score_variant(emissions, variant, config,
-                                    phone_log_probs, phone_to_id)
+                                    phone_log_probs, phone_to_id,
+                                    frame_weights)
             if scored is None:
                 continue
             if best is None or scored[0] > best[0]:
