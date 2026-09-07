@@ -18,3 +18,7 @@ requests~=2.32.3
 pillow~=11.2.1
 ffmpeg-python~=0.2.0
 Metaphone~=0.6
+nltk~=3.10.3
+g2p-en~=2.1.0
+num2words~=0.5.14
+truststore~=0.10

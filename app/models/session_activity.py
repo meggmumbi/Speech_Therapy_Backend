@@ -31,6 +31,27 @@ class SessionActivity(Base):
     correct_word_count = Column(Integer, default=0)
     total_word_count = Column(Integer, default=0)
 
+    # --- acoustic pipeline (v2) -------------------------------------------
+    condition = Column(String(1))          # 'K' or 'D', copied from the session
+    verdict = Column(String(20))           # correct/close/stress_error/incorrect/gated/unscorable
+    verdict_score = Column(Float)          # worst-phone aggregate; drives is_correct (H1)
+    confidence = Column(Float)             # recogniser confidence; gates diagnosis
+    gated = Column(Boolean, default=False) # excluded from correction-rate denominators
+    expected_phones = Column(JSON)
+    observed_phones = Column(JSON)
+    phone_scores = Column(JSON)            # per-phone GOP + calibrated score
+    diagnoses = Column(JSON)
+    applied_folds = Column(JSON)           # contrasts the model cannot represent
+    stress_error = Column(Boolean)
+    named_phone = Column(String(4))        # the phone the robot named, if any
+    feedback_word_count = Column(Integer)  # for K/D utterance-length reporting
+    # --- reproducibility ---------------------------------------------------
+    audio_ref = Column(String)             # path to the retained recording
+    pipeline_version = Column(String(20))
+    config_hash = Column(String(16))
+    model_id = Column(String(120))
+    stage_timings_ms = Column(JSON)        # per-stage latency, for the latency table
+
     created_at = Column(DateTime, default=datetime.utcnow)
     session = relationship("TherapySession", back_populates="activities")
     item = relationship("ActivityItem")

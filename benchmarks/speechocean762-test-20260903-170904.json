@@ -1,0 +1,78 @@
+[
+  {
+    "model": "mostafaashahin/wav2vec2-base-timit-phoneme-arpa-39",
+    "n_utterances": 60,
+    "n_phones": 1020,
+    "skipped": {},
+    "utterance_pcc": 0.6919190187372121,
+    "utterance_pcc_raw_gop": 0.6796402605958113,
+    "utterance_spearman": 0.609669352597944,
+    "phone_pcc": 0.2813539575919691,
+    "phone_pcc_raw_gop": 0.2889198632740104,
+    "n_words": 314,
+    "word_pcc": 0.21113370908205947,
+    "diagnosis": {
+      "attempted": 5,
+      "correct_phone_rate": 0.8,
+      "correct_pair_rate": 0.4
+    },
+    "detect_word_lt_10": {
+      "positive_rate": 0.08280254777070063,
+      "roc_auc": 0.7470619658119658,
+      "best_f1_upper_bound": 0.3023255813953488,
+      "precision_at_best": 0.21666666666666667,
+      "recall_at_best": 0.5,
+      "recall_at_precision_80": NaN,
+      "recall_at_precision_70": NaN
+    },
+    "detect_word_le_7": {
+      "positive_rate": 0.054140127388535034,
+      "roc_auc": 0.7347989700930877,
+      "best_f1_upper_bound": 0.2597402597402597,
+      "precision_at_best": 0.16666666666666666,
+      "recall_at_best": 0.5882352941176471,
+      "recall_at_precision_80": NaN,
+      "recall_at_precision_70": NaN
+    },
+    "detect_acc_lt_2": {
+      "positive_rate": 0.14215686274509803,
+      "roc_auc": 0.7026837438423645,
+      "best_f1_upper_bound": 0.4292929292929292,
+      "precision_at_best": 0.3386454183266932,
+      "recall_at_best": 0.5862068965517241,
+      "threshold_at_best": 0.010573351141261275,
+      "recall_at_precision_80": 0.013793103448275862,
+      "threshold_at_precision_80": 6.515237296799353e-06,
+      "recall_at_precision_60": 0.041379310344827586,
+      "threshold_at_precision_60": 1.4747032878427185e-05
+    },
+    "detect_acc_eq_0": {
+      "positive_rate": 0.00196078431372549,
+      "roc_auc": 0.7760314341846758,
+      "best_f1_upper_bound": 0.01652892561983471,
+      "precision_at_best": 0.008333333333333333,
+      "recall_at_best": 1.0,
+      "threshold_at_best": 0.008617591239035816,
+      "recall_at_precision_80": NaN,
+      "threshold_at_precision_80": NaN,
+      "recall_at_precision_60": NaN,
+      "threshold_at_precision_60": NaN
+    },
+    "latency": {
+      "p50_ms": 228.8061500294134,
+      "p95_ms": 429.83439998934034,
+      "mean_ms_per_audio_second": 69.36840660155978,
+      "mean_audio_seconds": 3.4729833333333326,
+      "stage_mean_ms": {
+        "trim": 1.1190866547015805,
+        "acoustic": 233.44010999426246,
+        "confidence": 0.09462166344746947,
+        "forced_align": 5.056113326766838,
+        "decode": 0.031938341756661735,
+        "align_phones": 0.812051670315365,
+        "stress": 0.16205498250201344,
+        "classify": 0.03168166925509771
+      }
+    }
+  }
+]

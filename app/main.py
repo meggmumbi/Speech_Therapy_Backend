@@ -6,15 +6,24 @@ from .api import (
     activities,
     speech_processing,
     analytics,
-    feedback, ws_routes, genericappendpoints
+    feedback, ws_routes, genericappendpoints, pronunciation, study
 )
 from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
 from .services import analyze_pronunciation, analyse_pronunciation
+from .services.pronunciation.runtime import warmup as warmup_pronunciation
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(debug=True)
+
+
+@app.on_event("startup")
+def _load_acoustic_model() -> None:
+    # Loading the model costs seconds and ~1.2 GB. Doing it here means the
+    # first participant of a session does not pay for it. Failures are logged
+    # inside warmup(), not raised: the rest of the API must still serve.
+    warmup_pronunciation()
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,9 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-print(analyse_pronunciation("slid", "slide"))
-
 
 app.include_router(ws_routes.router)
 
@@ -36,3 +42,5 @@ app.include_router(genericappendpoints.router, prefix="/generic", tags=["generic
 app.include_router(speech_processing.router, prefix="/speech", tags=["speech_processing"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])  # Add this line
 app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])  # Add this line
+app.include_router(pronunciation.router, prefix="/pronunciation", tags=["pronunciation"])
+app.include_router(study.router, prefix="/study", tags=["study"])

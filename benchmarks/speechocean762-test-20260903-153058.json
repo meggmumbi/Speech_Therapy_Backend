@@ -1,0 +1,43 @@
+[
+  {
+    "model": "mostafaashahin/wav2vec2-base-timit-phoneme-arpa-39",
+    "n_utterances": 100,
+    "n_phones": 1584,
+    "skipped": {},
+    "utterance_pcc": 0.4795141738872659,
+    "utterance_spearman": 0.4531173117311731,
+    "phone_pcc": 0.2937484269086607,
+    "detect_acc_lt_2": {
+      "positive_rate": 0.14709595959595959,
+      "roc_auc": 0.7325046142898441,
+      "best_f1_upper_bound": 0.4294670846394985,
+      "precision_at_best": 0.33827160493827163,
+      "recall_at_best": 0.5879828326180258,
+      "threshold_at_best": 0.011
+    },
+    "detect_acc_eq_0": {
+      "positive_rate": 0.0012626262626262627,
+      "roc_auc": 0.7648546144121365,
+      "best_f1_upper_bound": 0.010126582278481015,
+      "precision_at_best": 0.005089058524173028,
+      "recall_at_best": 1.0,
+      "threshold_at_best": 0.009
+    },
+    "latency": {
+      "p50_ms": 248.0822999496013,
+      "p95_ms": 452.42671985179186,
+      "mean_ms_per_audio_second": 77.19042125306756,
+      "mean_audio_seconds": 3.52708,
+      "stage_mean_ms": {
+        "trim": 1.2084120139479637,
+        "acoustic": 264.3717550020665,
+        "confidence": 0.09195099817588925,
+        "forced_align": 5.406799998600036,
+        "decode": 0.036142009776085615,
+        "align_phones": 0.769975995644927,
+        "stress": 0.16119999578222632,
+        "classify": 0.03102501854300499
+      }
+    }
+  }
+]

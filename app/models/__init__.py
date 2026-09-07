@@ -10,5 +10,4 @@ from .LearningPath import LearningPath
 from .ChildCategoryDisplay import ChildCategoryDisplay
 from .GazeTrackingData import GazeTrackingData
 from .token_blacklist import TokenBlacklist
-
-
+from .study_assignment import StudyAssignment

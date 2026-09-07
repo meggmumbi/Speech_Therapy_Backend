@@ -18,6 +18,12 @@ class TherapySession(Base):
     start_time = Column(DateTime, default=datetime.utcnow)
     end_time = Column(DateTime)
     current_level = Column(String(20))
+    # Study condition for this session: 'K' (knowledge of correct response --
+    # re-model only) or 'D' (diagnostic feedback). Assigned per session by the
+    # counterbalancing, so that a single app renders whichever feedback the
+    # backend returns and the two conditions cannot drift apart in UI, timing
+    # or scoring.
+    condition = Column(String(1))
     is_completed = Column(Boolean, default=False)
     child = relationship("Child")
     category = relationship("ActivityCategory")
