@@ -35,11 +35,13 @@ import numpy as np
 
 from .acoustic import AcousticModel, Emissions
 from .audio import trim_silence
-from .align import PhoneOp, align_phones, attach_phones, ctc_forced_align
+from .align import (PhoneOp, align_phones, attach_phones, ctc_forced_align,
+                    expand_spans)
 from .config import DEFAULT_CONFIG, PipelineConfig
 from .features import resolve_to_inventory, strip_stress
 from .gop import (PhoneScore, aggregate_score, compute_phone_scores,
-                  greedy_phone_decode, utterance_confidence, word_score)
+                  greedy_phone_decode, phone_posteriors,
+                  utterance_confidence, word_score)
 from .lexicon import ResourceUnavailable, normalize_text, pronunciations
 from .prosody import StressAnalysis, analyse_stress
 
@@ -116,8 +118,15 @@ def _score_variant(
     emissions: Emissions,
     variant: tuple[str, ...],
     config: PipelineConfig,
+    phone_log_probs: np.ndarray,
+    phone_to_id: dict[str, int],
 ) -> tuple[float, list[PhoneScore], list, list[tuple[str, str]]] | None:
-    """Forced-align and GOP-score one dictionary variant. None if unalignable."""
+    """Forced-align and GOP-score one dictionary variant. None if unalignable.
+
+    Alignment runs on the full CTC matrix, because it needs the blank symbol.
+    Scoring runs on the phone-only matrix, because GOP is defined over phone
+    posteriors -- see gop.phone_posteriors.
+    """
     resolution = resolve_to_inventory(list(variant), emissions.phone_to_id)
     if resolution is None:
         # A phone with no representation in the model's inventory, not even a
@@ -131,9 +140,11 @@ def _score_variant(
     except ValueError:
         return None
     spans = attach_phones(spans, segmental)
+    # CTC peaks are one frame wide; widen them to real phone segments before
+    # averaging anything over them.
+    spans = expand_spans(spans, emissions.n_frames)
     phone_scores = compute_phone_scores(
-        emissions.log_probs, spans, list(variant),
-        emissions.phone_to_id, config.gop_tau,
+        phone_log_probs, spans, list(variant), phone_to_id, config.gop_tau,
     )
     return (
         word_score(phone_scores, config.duration_weighted_score),
@@ -293,7 +304,11 @@ def score_phone_sequence(
         emissions = model.emissions(waveform, sample_rate)
 
     with timings.stage("confidence"):
-        confidence = utterance_confidence(emissions.log_probs)
+        # Everything downstream of here scores over phone posteriors, not the
+        # raw CTC matrix in which blank wins nearly every frame.
+        phone_log_probs, phone_to_id, _ = phone_posteriors(
+            emissions.log_probs, emissions.phone_to_id)
+        confidence = utterance_confidence(phone_log_probs)
     if confidence < config.thresholds.confidence_gate:
         return _gated(target, "gated",
                       f"recogniser confidence {confidence:.2f} below gate",
@@ -302,7 +317,8 @@ def score_phone_sequence(
     with timings.stage("forced_align"):
         best = None
         for variant in variants:
-            scored = _score_variant(emissions, variant, config)
+            scored = _score_variant(emissions, variant, config,
+                                    phone_log_probs, phone_to_id)
             if scored is None:
                 continue
             if best is None or scored[0] > best[0]:

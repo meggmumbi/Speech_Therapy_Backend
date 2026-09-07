@@ -53,6 +53,39 @@ class PhoneScore:
         return self.end_frame > self.start_frame
 
 
+def phone_posteriors(
+    log_probs: np.ndarray,
+    phone_to_id: Mapping[str, int],
+) -> tuple[np.ndarray, dict[str, int], dict[int, str]]:
+    """Restrict the emission matrix to phone labels and renormalise.
+
+    GOP is defined over *phone* posteriors. Computing it on a raw CTC matrix
+    instead compares the expected phone against the blank symbol, which on a
+    peaky model wins almost every frame -- so a correctly produced phone scores
+    as badly as a wrong one, and the whole measure collapses.
+
+    The same mistake made the confidence gate useless: measured over all
+    labels it reported 0.97-0.9999 on every pilot recording, including 5
+    seconds of someone else's conversation, because it was reporting how
+    certain the model was that a frame was *blank*.
+
+    Returns the renormalised log-probability matrix over phones only, plus
+    remapped label dictionaries for its new column order.
+    """
+    ids = sorted(set(phone_to_id.values()))
+    columns = np.asarray(ids, dtype=np.int64)
+    subset = log_probs[:, columns]
+    # Renormalise so each frame is a proper distribution over phones.
+    shifted = subset - subset.max(axis=1, keepdims=True)
+    subset = shifted - np.log(np.exp(shifted).sum(axis=1, keepdims=True))
+
+    position = {original: new for new, original in enumerate(ids)}
+    new_phone_to_id = {p: position[i] for p, i in phone_to_id.items()
+                       if i in position}
+    new_id_to_phone = {v: k for k, v in new_phone_to_id.items()}
+    return subset, new_phone_to_id, new_id_to_phone
+
+
 def gop_to_score(gop: float, tau: float) -> float:
     """Map a GOP value (<= 0) onto ``[0, 1]``.
 
@@ -209,12 +242,18 @@ def aggregate_score(
 
 
 def utterance_confidence(log_probs: np.ndarray) -> float:
-    """Mean top-1 frame posterior: the input to the confidence gate.
+    """Mean top-1 *phone* posterior: the input to the confidence gate.
+
+    ``log_probs`` must already be restricted to phone labels by
+    :func:`phone_posteriors`. Computed over a raw CTC matrix this returns ~1.0
+    for anything at all, because blank wins nearly every frame on a peaky
+    model -- which is precisely what happened in the first pilot, where every
+    recording reported 0.97-0.9999 and the gate never once fired.
 
     When this falls below the configured threshold the robot should ask the
     speaker to repeat rather than diagnose. Confidently wrong feedback is the
-    single worst failure mode for a tutoring system, and the participants in
-    the first study were already hinting at it in their accent complaints.
+    single worst failure mode for a tutoring system, and participants in the
+    first study were already hinting at it in their accent complaints.
     """
     if log_probs.size == 0:
         return 0.0

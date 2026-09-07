@@ -229,6 +229,68 @@ def attach_phones(spans: Sequence[FrameSpan], phones: Sequence[str]) -> list[Fra
     ]
 
 
+# No English phone lasts half a second, even a drawled stressed vowel. Without
+# this cap the first and last segments swallow every leading and trailing frame
+# -- on the pilot recordings the final phone absorbed up to 106 frames (2.1 s)
+# of trailing speech, and its GOP measured that speech rather than the phone.
+MAX_PHONE_FRAMES = 25          # 500 ms at a 20 ms stride
+
+
+def expand_spans(spans: Sequence[FrameSpan], n_frames: int,
+                 max_phone_frames: int = MAX_PHONE_FRAMES) -> list[FrameSpan]:
+    """Grow one-frame CTC peaks into contiguous phone segments.
+
+    A trained CTC model is *peaky*: it emits a single spike for each token and
+    blank everywhere else. Viterbi therefore puts the label state on roughly
+    one frame per phone, so the raw spans from :func:`ctc_forced_align` are
+    ~20 ms each regardless of how long the phone actually was.
+
+    Measured on the first pilot session, that meant only 60-120 ms of each
+    540-740 ms word was scored at all, and GOP -- an average over the span --
+    degenerated to a single frame's posterior. Scores came out bimodal (1.0 or
+    ~1e-05) with nothing in between, no usable gradation for H2, and duration
+    weighting and stress analysis both inert because every span had the same
+    width.
+
+    Boundaries are placed at the midpoint between consecutive peaks, so each
+    segment stays centred on the frame the aligner actually chose. The first
+    segment runs from frame 0 and the last to ``n_frames``, which is sound
+    because silence is trimmed before alignment: the first phone begins where
+    the speech does.
+
+    Phones the aligner never emitted keep a zero-width span -- that is the
+    deletion signal, and inventing a segment for them would erase it.
+    """
+    emitted = [sp for sp in spans if sp.end_frame > sp.start_frame]
+    if not emitted:
+        return list(spans)
+
+    half_cap = max(max_phone_frames // 2, 1)
+    boundaries: dict[int, tuple[int, int]] = {}
+    for position, span in enumerate(emitted):
+        left = 0 if position == 0 else (
+            (emitted[position - 1].end_frame + span.start_frame) // 2)
+        right = n_frames if position == len(emitted) - 1 else (
+            (span.end_frame + emitted[position + 1].start_frame) // 2)
+        # Keep the segment near its peak. Anything beyond the cap is not this
+        # phone, whether it is silence, a neighbouring phone, or -- as in the
+        # pilot -- a whole further utterance the recorder captured.
+        left = max(left, span.start_frame - half_cap)
+        right = min(right, span.end_frame + half_cap)
+        # Never let a rounded midpoint invert a segment.
+        right = max(right, left + 1)
+        boundaries[span.token_index] = (left, right)
+
+    out: list[FrameSpan] = []
+    for span in spans:
+        if span.token_index in boundaries:
+            left, right = boundaries[span.token_index]
+            out.append(FrameSpan(span.token_index, span.phone, left, right))
+        else:
+            out.append(span)
+    return out
+
+
 def stress_errors(expected: Sequence[str], observed_stress: Sequence[int | None]
                   ) -> list[tuple[int, int, int]]:
     """Compare realised stress against CMUdict marks on the expected vowels.

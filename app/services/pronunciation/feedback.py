@@ -164,6 +164,12 @@ PRAISE: tuple[str, ...] = (
 # enough to judge. Never a diagnosis, never a verdict.
 GATED_PROMPT = "I didn't quite catch that. Could you say it once more?"
 
+# Said on the final attempt of an item instead of inviting another try. The
+# word is still modelled once -- that ingredient is shared by both conditions
+# and dropping it here would unbalance them -- but nothing asks the
+# participant to repeat, because nothing will.
+MOVE_ON = "The word is {word}. Let's go on to the next one."
+
 _ORDINALS = ("first", "second", "third", "fourth", "fifth", "sixth")
 
 
@@ -279,6 +285,7 @@ def generate_feedback(
     attempt_index: int = 0,
     use_contrast_cue: bool = False,
     match_length: bool = True,
+    retry_available: bool = True,
 ) -> Feedback:
     """Render one turn of robot speech for a scored attempt.
 
@@ -290,6 +297,12 @@ def generate_feedback(
     conditions are closer in spoken duration. Turning it off restores the
     unmatched script and reopens the length confound; it exists so the choice
     is explicit and logged rather than implicit in the code.
+
+    ``retry_available`` must say whether the participant will actually get
+    another attempt at this item. When they will not, the utterance closes the
+    item instead of inviting a retry: telling someone to "listen again" and
+    then advancing to the next word is worse than saying nothing, and it is
+    exactly what the first pilot did.
     """
     if result.verdict == "gated" or result.verdict == "unscorable":
         # Identical in both conditions: no verdict, no diagnosis, no re-model.
@@ -303,7 +316,7 @@ def generate_feedback(
                         remodel=False)
 
     marker = WARMTH_MARKERS[attempt_index % len(WARMTH_MARKERS)]
-    remodel = _remodel(word)
+    remodel = _remodel(word) if retry_available else MOVE_ON.format(word=word)
 
     # Condition K: knowledge of correct response only. Re-model, plus neutral
     # filler if length matching is on -- never a diagnosis.

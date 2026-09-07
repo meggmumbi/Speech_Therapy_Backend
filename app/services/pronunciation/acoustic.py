@@ -259,7 +259,7 @@ class StubAcousticModel:
     def describe(self) -> ModelInfo:
         return ModelInfo(
             model_id="stub", backend="stub", device="cpu",
-            n_labels=len(self.phone_to_id) + 1,
+            n_labels=max(self.phone_to_id.values(), default=self.blank_id) + 1,
             inventory=tuple(sorted(self.phone_to_id)),
             frame_stride_s=self._frame_stride_s,
         )
@@ -268,7 +268,10 @@ class StubAcousticModel:
         return None
 
     def emissions(self, waveform: np.ndarray, sample_rate: int) -> Emissions:
-        n_labels = len(self.phone_to_id) + 1
+        # Size from the highest id, not the label count: a test that removes a
+        # phone from the inventory leaves the remaining ids sparse, and sizing
+        # by count would then index past the end of the matrix.
+        n_labels = max(self.phone_to_id.values(), default=self.blank_id) + 1
         n_frames = max(len(self.produced) * self.frames_per_phone, 1)
         probs = np.full((n_frames, n_labels), (1.0 - self.confidence) / (n_labels - 1))
         for i, phone in enumerate(self.produced):

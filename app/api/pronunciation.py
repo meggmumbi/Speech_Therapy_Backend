@@ -133,22 +133,37 @@ async def score_pronunciation_attempt(
 
     waveform, sample_rate = _decode_wav(raw)
 
-    attempt_number = db.query(SessionActivity).filter(
+    prior = db.query(SessionActivity).filter(
         SessionActivity.session_id == session_id,
         SessionActivity.item_id == item_id,
-    ).count() + 1
+    ).all()
+    attempt_number = len(prior) + 1
+    # A gated attempt is a request to repeat, not an attempt: it must not eat
+    # into the item's retry budget, or two unclear recordings would end the
+    # item without the participant ever having been scored.
+    scored_before = sum(1 for a in prior if not a.gated)
 
     config = get_config()
     result = score_attempt(str(item.name), waveform, sample_rate,
                            get_model(), config)
 
+    gated = result.verdict in ("gated", "unscorable")
+    # Whether another attempt at this item follows. The client must not decide
+    # this independently: the feedback wording depends on it, and two counters
+    # drifting apart is how the robot ends up promising a retry it will not give.
+    retry_available = (
+        not result.is_correct
+        and not gated
+        and (scored_before + 1) < config.max_attempts_per_item
+    )
+
     # attempt_number - 1 so the first attempt of an item draws index 0, and K
     # and D draw the same warmth marker at the same point in a session.
     feedback = generate_feedback(result, str(item.name), condition,
-                                 attempt_index=attempt_number - 1)
+                                 attempt_index=attempt_number - 1,
+                                 retry_available=retry_available)
 
     audio_ref = _persist_audio(raw, session_id, item_id, attempt_number)
-    gated = result.verdict in ("gated", "unscorable")
 
     activity = SessionActivity(
         session_id=session_id,
@@ -195,6 +210,8 @@ async def score_pronunciation_attempt(
         # gated attempts are a request to repeat, not a scored attempt, and
         # are excluded from correction-rate denominators in analysis
         "gated": gated,
+        # Authoritative: the client advances the item when this is false.
+        "should_retry": retry_available,
         "score": result.score,
         "verdict_score": result.verdict_score,
         "confidence": result.confidence,

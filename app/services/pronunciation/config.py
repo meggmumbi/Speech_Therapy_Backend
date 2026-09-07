@@ -154,6 +154,13 @@ class PipelineConfig:
     max_audio_seconds: float = 4.0
     min_audio_seconds: float = 0.2
 
+    # Attempts allowed per item, gated attempts excluded. The backend owns
+    # this because the feedback wording depends on it: on the last attempt the
+    # robot must not say "listen again" and then move on, which is what
+    # happened in the first pilot and left participants hearing a retry
+    # instruction while the tablet showed the next word.
+    max_attempts_per_item: int = 2
+
     def config_hash(self) -> str:
         """Stable 12-hex-char digest of everything that affects the output."""
         payload = json.dumps(asdict(self), sort_keys=True, default=str)
