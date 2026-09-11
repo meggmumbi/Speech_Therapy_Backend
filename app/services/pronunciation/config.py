@@ -56,19 +56,23 @@ class Thresholds:
     # Verdict-score (worst_k, NOT the mean quality score) at or above which an
     # attempt counts as correct.
     #
-    # These are on the worst-phone scale and must not be carried over from the
-    # mean scale: 0.70 was a mean-scale placeholder, and on worst_k it called
-    # 48.3% of Speechocean762 words incorrect against a true rate of 10.3%.
+    # Fitted on Speechocean762 test (15,941 words, L2-large, worst_k k=2,
+    # linear GOP mapping with floor -10, 2026-09-07):
     #
-    # 0.30 was picked on the saved benchmark (15,967 words, L2-large): it
-    # flags 19.7% of words, sensitivity 0.600, specificity 0.849. Maximum
-    # Youden J sits at 0.52, but that flags 38.4% -- and for a tutor,
-    # wrongly telling a learner they were wrong is worse than missing an
-    # error, and it inflates H1's "incorrect first attempt" denominator. So
-    # specificity is favoured over the balanced optimum deliberately.
-    correct: float = 0.30
+    #     threshold  flagged%  sensitivity  specificity  precision
+    #     0.25       3.9       0.203        0.980        0.542
+    #     0.50       11.7      0.470        0.924        0.414
+    #     0.80       32.1      0.795        0.734        0.255   <- max Youden J
+    #
+    # 0.50 is chosen because it flags 11.7% against a true mispronunciation
+    # rate of 10.3% -- the verdict neither over- nor under-flags in aggregate,
+    # which is what keeps H1's "incorrect first attempt" denominator honest.
+    # Max Youden J sits at 0.80 but flags a third of all words at precision
+    # 0.255; for a tutor, wrongly telling a learner they were wrong is the
+    # more costly error, so specificity is favoured deliberately.
+    correct: float = 0.50
     # Band below `correct` reported as "close" rather than plain wrong.
-    close: float = 0.12
+    close: float = 0.30
     # Per-phone score below which a phone is flagged as a probable error.
     phone_error: float = 0.45
     # Articulatory distance above which a substitution is "gross" rather than
@@ -80,8 +84,9 @@ class Thresholds:
     confidence_gate: float = 0.35
 
     provenance: str = (
-        "PROVISIONAL. correct/close fitted on Speechocean762 test "
-        "(15,967 words, L2-large, worst_k k=2 verdict scale, 2026-09-04); "
+        "PROVISIONAL. gop_floor and correct/close fitted on Speechocean762 "
+        "test (15,941 words, L2-large, worst_k k=2, linear GOP mapping, "
+        "2026-09-07); "
         "phone_error, gross_substitution and confidence_gate are still "
         "unfitted placeholders. Speechocean762 is L1-Mandarin speakers "
         "reading sentences, while the study is Kenyan English speakers on "
@@ -109,12 +114,38 @@ class PipelineConfig:
     trim_silence: bool = True
     silence_threshold_db: float = -40.0
 
+    # Reference accent. "en-GB" uses the BEEP British lexicon and the
+    # non-rhotic/yod adaptations; "en-US" uses CMUdict unchanged. Kenyan
+    # English is taught on British English, so en-GB is the study default.
+    accent: str = "en-GB"
+
+    # Trust the client's ASR transcript as evidence the right word was said.
+    # The transcript can only RESCUE an attempt from a false "incorrect", never
+    # push one toward it -- see scoring._classify.
+    trust_transcript: bool = True
+    # Guard on the transcript rescue: at least this fraction of the expected
+    # phones must have real acoustic support before a matching transcript is
+    # allowed to overturn an acoustic "incorrect".
+    #
+    # A single global score floor does not work here. Under the linear GOP
+    # mapping even an utterance sharing nothing with the target scores ~0.4
+    # overall, so no floor separates "accented but correct" from "not the word
+    # at all". Counting how many expected phones the audio actually supports
+    # does separate them: nonsense supports almost none, an accented correct
+    # production supports nearly all.
+    transcript_rescue_min_phone_fraction: float = 0.5
+
     sample_rate: int = 16_000
     # wav2vec2 emits one frame per 20 ms of audio at 16 kHz.
     frame_stride_s: float = 0.02
 
-    # Temperature of the GOP -> [0, 1] mapping (see gop.gop_to_score).
-    gop_tau: float = 1.0
+    # GOP value mapped to a score of 0 (see gop.gop_to_score). Fitted on
+    # Speechocean762 test, L2-large, worst_k k=2 (2026-09-07): correlation with
+    # expert word accuracy by floor -- -2: 0.364, -4: 0.390, -6: 0.415,
+    # -8: 0.433, -10: 0.443, with detection AUC 0.820 -> 0.837 over the same
+    # range. -10 sits at the 1st percentile of observed per-phone GOP
+    # (-11.23), so the clip bites only on genuinely extreme phones.
+    gop_floor: float = -10.0
     # Cost of an unaligned phone in the expected-vs-observed alignment.
     gap_cost: float = 0.6
     duration_weighted_score: bool = True

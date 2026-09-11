@@ -243,6 +243,14 @@ class StubAcousticModel:
     feedback -- can be tested without a 400 MB download, and so tests can
     construct exact error cases ("the learner said T where TH was expected,
     confidently") that are hard to elicit from real audio on demand.
+
+    Emissions are deliberately **peaky**, like a real trained CTC model: one
+    confident frame per phone with blank dominating everything around it. An
+    earlier version spread confidence evenly across every frame with no blank
+    at all, and because of that it could not reproduce the failure mode that
+    took two rounds of debugging on real audio -- flat averaging over
+    blank-dominated frames burying the signal. A stub that cannot express the
+    bug cannot guard against it.
     """
 
     def __init__(self, produced: Sequence[str] = (), frames_per_phone: int = 5,
@@ -273,13 +281,23 @@ class StubAcousticModel:
         # by count would then index past the end of the matrix.
         n_labels = max(self.phone_to_id.values(), default=self.blank_id) + 1
         n_frames = max(len(self.produced) * self.frames_per_phone, 1)
-        probs = np.full((n_frames, n_labels), (1.0 - self.confidence) / (n_labels - 1))
+
+        residual = (1.0 - self.confidence) / max(n_labels - 1, 1)
+        probs = np.full((n_frames, n_labels), residual)
+        # Blank owns every frame except the per-phone peaks.
+        probs[:, self.blank_id] = self.confidence
+
         for i, phone in enumerate(self.produced):
-            pid = self.phone_to_id.get(phone, self.blank_id)
-            lo = i * self.frames_per_phone
-            probs[lo:lo + self.frames_per_phone, :] = \
-                (1.0 - self.confidence) / (n_labels - 1)
-            probs[lo:lo + self.frames_per_phone, pid] = self.confidence
+            pid = self.phone_to_id.get(phone)
+            if pid is None:
+                continue
+            peak = i * self.frames_per_phone + self.frames_per_phone // 2
+            if peak >= n_frames:
+                continue
+            probs[peak, :] = residual
+            probs[peak, pid] = self.confidence
+
+        probs /= probs.sum(axis=1, keepdims=True)
         return Emissions(
             log_probs=np.log(probs),
             phone_to_id=self.phone_to_id, id_to_phone=self.id_to_phone,

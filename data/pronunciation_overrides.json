@@ -1,0 +1,16 @@
+{
+  "_README": [
+    "Hand-set expected pronunciations, in ARPAbet, highest precedence of all",
+    "reference layers. Use this for items where BEEP is wrong or contested, or",
+    "where the study is deliberately teaching one particular form.",
+    "",
+    "Format:  \"word\": \"PH ON ES\"   or   \"word\": [\"FORM ONE\", \"FORM TWO\"]",
+    "Several forms are all ACCEPTED - scoring takes the best-matching one.",
+    "Stress digits are optional and ignored for segmental scoring.",
+    "",
+    "Edit this file and restart, or call references.reload_sources().",
+    "Anything listed here should be signed off by whoever decides what the",
+    "study teaches - the pipeline will score against it without question."
+  ],
+  "_EXAMPLE_niche": ["N IY SH", "N IH CH"]
+}

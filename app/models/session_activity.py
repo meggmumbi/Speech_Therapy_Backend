@@ -45,6 +45,11 @@ class SessionActivity(Base):
     stress_error = Column(Boolean)
     named_phone = Column(String(4))        # the phone the robot named, if any
     feedback_word_count = Column(Integer)  # for K/D utterance-length reporting
+    # --- reference provenance and the ASR cross-check ----------------------
+    reference_source = Column(String(20))      # override/beep/cmudict+gb-rules/cmudict/g2p
+    reference_needs_review = Column(Boolean)   # target was a g2p prediction
+    transcript = Column(String)                # client ASR output, if sent
+    transcript_matches = Column(Boolean)       # did it agree the target was said
     # --- reproducibility ---------------------------------------------------
     audio_ref = Column(String)             # path to the retained recording
     pipeline_version = Column(String(20))

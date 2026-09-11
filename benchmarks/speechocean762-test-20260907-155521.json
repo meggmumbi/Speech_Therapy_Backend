@@ -1,0 +1,154 @@
+[
+  {
+    "model": "slplab/wav2vec2-large-robust-L2-english-phoneme-recognition",
+    "n_utterances": 2500,
+    "n_phones": 46524,
+    "skipped": {},
+    "utterance_pcc": 0.5896131984476193,
+    "utterance_pcc_raw_gop": 0.5922362365732139,
+    "utterance_spearman": 0.5742639687462351,
+    "phone_pcc": 0.3521496879947127,
+    "phone_pcc_raw_gop": 0.42990846256581855,
+    "n_words": 15941,
+    "word_pcc": 0.3395263930690028,
+    "diagnosis": {
+      "attempted": 1295,
+      "correct_phone_rate": 0.6362934362934363,
+      "correct_pair_rate": 0.17374517374517376
+    },
+    "detect_word_lt_10": {
+      "positive_rate": 0.10287936766827677,
+      "roc_auc": 0.7961169780042672,
+      "best_f1_upper_bound": 0.36926147704590817,
+      "precision_at_best": 0.2744807121661721,
+      "recall_at_best": 0.5640243902439024,
+      "recall_at_precision_80": 0.0012195121951219512,
+      "recall_at_precision_70": 0.0012195121951219512
+    },
+    "detect_word_le_7": {
+      "positive_rate": 0.08249168809986826,
+      "roc_auc": 0.8099502994563045,
+      "best_f1_upper_bound": 0.33553895410885803,
+      "precision_at_best": 0.23323442136498515,
+      "recall_at_best": 0.5977186311787073,
+      "recall_at_precision_80": 0.001520912547528517,
+      "recall_at_precision_70": 0.001520912547528517
+    },
+    "detect_acc_lt_2": {
+      "positive_rate": 0.1792838105064053,
+      "roc_auc": 0.6874503082023768,
+      "best_f1_upper_bound": 0.4282399407553691,
+      "precision_at_best": 0.36402551619942924,
+      "recall_at_best": 0.5199616352955281,
+      "threshold_at_best": 0.7217644786871483,
+      "recall_at_precision_80": 0.0014386764176957199,
+      "threshold_at_precision_80": 1.367546353814605e-07,
+      "recall_at_precision_60": 0.10538304759621149,
+      "threshold_at_precision_60": 0.00013460185477733166
+    },
+    "detect_acc_eq_0": {
+      "positive_rate": 0.01659358610609578,
+      "roc_auc": 0.894022866691974,
+      "best_f1_upper_bound": 0.27100747910250766,
+      "precision_at_best": 0.20519653564290474,
+      "recall_at_best": 0.39896373056994816,
+      "threshold_at_best": 0.00014228083059679195,
+      "recall_at_precision_80": 0.0025906735751295338,
+      "threshold_at_precision_80": 1.1462478617480314e-08,
+      "recall_at_precision_60": 0.0038860103626943004,
+      "threshold_at_precision_60": 4.521006552665743e-08
+    },
+    "latency": {
+      "p50_ms": 754.8922499408945,
+      "p95_ms": 1481.3513700501055,
+      "mean_ms_per_audio_second": 214.36027430245213,
+      "mean_audio_seconds": 3.8754592,
+      "stage_mean_ms": {
+        "trim": 0.9869469218887389,
+        "acoustic": 820.1256321237422,
+        "confidence": 0.2915044798515737,
+        "forced_align": 7.939006641600281,
+        "decode": 0.04191344203427434,
+        "align_phones": 0.879543802049011,
+        "stress": 0.22969944039359688,
+        "classify": 0.05378200085833669
+      }
+    }
+  },
+  {
+    "model": "mostafaashahin/wav2vec2-base-timit-phoneme-arpa-39",
+    "n_utterances": 2500,
+    "n_phones": 45828,
+    "skipped": {},
+    "utterance_pcc": 0.5696116591374724,
+    "utterance_pcc_raw_gop": 0.6114532511855391,
+    "utterance_spearman": 0.5683728963156636,
+    "phone_pcc": 0.30091438527138037,
+    "phone_pcc_raw_gop": 0.3800409336737333,
+    "n_words": 15935,
+    "word_pcc": 0.2848367414351693,
+    "diagnosis": {
+      "attempted": 1618,
+      "correct_phone_rate": 0.6149567367119901,
+      "correct_pair_rate": 0.1433868974042027
+    },
+    "detect_word_lt_10": {
+      "positive_rate": 0.1031063696266081,
+      "roc_auc": 0.7665202295773791,
+      "best_f1_upper_bound": 0.3325665461715412,
+      "precision_at_best": 0.22777402655863155,
+      "recall_at_best": 0.6159464394400487,
+      "recall_at_precision_80": NaN,
+      "recall_at_precision_70": NaN
+    },
+    "detect_word_le_7": {
+      "positive_rate": 0.08277376843426419,
+      "roc_auc": 0.77498528931498,
+      "best_f1_upper_bound": 0.29564907275320973,
+      "precision_at_best": 0.19328514805315924,
+      "recall_at_best": 0.6285064442759667,
+      "recall_at_precision_80": NaN,
+      "recall_at_precision_70": NaN
+    },
+    "detect_acc_lt_2": {
+      "positive_rate": 0.18270489656978267,
+      "roc_auc": 0.7245962307123339,
+      "best_f1_upper_bound": 0.44291310709397275,
+      "precision_at_best": 0.366162010301233,
+      "recall_at_best": 0.5603726262988177,
+      "threshold_at_best": 0.02288260113988115,
+      "recall_at_precision_80": 0.0025080616266571123,
+      "threshold_at_precision_80": 8.975058444047558e-06,
+      "recall_at_precision_60": 0.09076794458378121,
+      "threshold_at_precision_60": 5.088631118250494e-05
+    },
+    "detect_acc_eq_0": {
+      "positive_rate": 0.019202234441825956,
+      "roc_auc": 0.864862578575647,
+      "best_f1_upper_bound": 0.21606254442075334,
+      "precision_at_best": 0.15718717683557393,
+      "recall_at_best": 0.34545454545454546,
+      "threshold_at_best": 7.535909951447501e-05,
+      "recall_at_precision_80": 0.004545454545454545,
+      "threshold_at_precision_80": 5.826967010975641e-06,
+      "recall_at_precision_60": 0.005681818181818182,
+      "threshold_at_precision_60": 6.515793232761655e-06
+    },
+    "latency": {
+      "p50_ms": 281.23494994360954,
+      "p95_ms": 549.7991451411508,
+      "mean_ms_per_audio_second": 81.37881546551756,
+      "mean_audio_seconds": 3.8754592,
+      "stage_mean_ms": {
+        "trim": 0.9597193212248385,
+        "acoustic": 304.94761788193136,
+        "confidence": 0.28384195920079947,
+        "forced_align": 7.7247134015895424,
+        "decode": 0.03956983871757984,
+        "align_phones": 0.9463868767023087,
+        "stress": 0.22407764038071037,
+        "classify": 0.059343999810516836
+      }
+    }
+  }
+]

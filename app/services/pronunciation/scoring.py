@@ -42,7 +42,8 @@ from .features import resolve_to_inventory, strip_stress
 from .gop import (PhoneScore, aggregate_score, blank_weights,
                   compute_phone_scores, greedy_phone_decode, phone_posteriors,
                   utterance_confidence, word_score)
-from .lexicon import ResourceUnavailable, normalize_text, pronunciations
+from .lexicon import ResourceUnavailable, normalize_text
+from .references import Reference, ReferenceSource, reference_for
 from .prosody import StressAnalysis, analyse_stress
 
 Verdict = Literal["correct", "close", "stress_error", "incorrect", "gated", "unscorable"]
@@ -100,6 +101,10 @@ class AttemptScore:
     timings: Timings
     provenance: dict[str, str | None]
     note: str | None = None               # why an attempt was gated/unscorable
+    reference_source: str | None = None   # which lexicon layer supplied the target
+    reference_needs_review: bool = False  # true when the target is a g2p prediction
+    transcript: str | None = None         # ASR transcript, when the client sent one
+    transcript_matches: bool | None = None
 
 
 def _gated(word: str, verdict: Verdict, note: str, confidence: float,
@@ -145,7 +150,7 @@ def _score_variant(
     # averaging anything over them.
     spans = expand_spans(spans, emissions.n_frames)
     phone_scores = compute_phone_scores(
-        phone_log_probs, spans, list(variant), phone_to_id, config.gop_tau,
+        phone_log_probs, spans, list(variant), phone_to_id, config.gop_floor,
         frame_weights=frame_weights,
     )
     return (
@@ -209,12 +214,65 @@ def _diagnose(
     return diagnoses
 
 
+def transcript_matches_target(transcript: str | None, target: str,
+                              reference: Reference | None) -> bool | None:
+    """Did the client's ASR hear the target word?
+
+    ``None`` when no transcript was sent. Matching is on normalised text, and
+    also accepts a transcript that is a homophone of the target under the
+    reference lexicon -- "colonel" heard as "kernel" is the right word said
+    right, and marking it wrong is the kind of failure that makes participants
+    stop trusting the robot.
+    """
+    if transcript is None:
+        return None
+    heard = normalize_text(transcript)
+    if not heard:
+        return False
+    if heard == target:
+        return True
+    # A single-word target heard as one word: compare pronunciations.
+    if reference is not None and len(heard.split()) == 1:
+        try:
+            heard_ref = reference_for(heard, accent="en-GB")
+        except Exception:  # noqa: BLE001 - lexicon trouble must not fail scoring
+            heard_ref = None
+        if heard_ref is not None:
+            target_forms = {tuple(strip_stress(x) for x in v)
+                            for v in reference.variants}
+            heard_forms = {tuple(strip_stress(x) for x in v)
+                           for v in heard_ref.variants}
+            if target_forms & heard_forms:
+                return True
+    return False
+
+
 def _classify(
     score: float,
     diagnoses: Sequence[PhoneDiagnosis],
     stress: StressAnalysis | None,
     config: PipelineConfig,
+    transcript_match: bool | None = None,
+    phone_scores: Sequence[PhoneScore] = (),
 ) -> Verdict:
+    """Decide the verdict from the acoustic evidence, with an ASR safety net.
+
+    The acoustic path decides on its own merits first. A matching ASR
+    transcript can then *rescue* an attempt the acoustics called wrong, but a
+    non-matching transcript can never push one toward wrong.
+
+    That asymmetry is deliberate. Telling a volunteer they mispronounced a word
+    they said correctly is the worst failure this system can have -- it makes
+    them stop trusting the feedback, and it inflates H1's "incorrect first
+    attempt" denominator with attempts that were never incorrect. The client's
+    recogniser is good at word identity, so when it agrees the right word was
+    said and the acoustics are not catastrophic, the attempt counts as correct.
+
+    Letting the transcript rescue but not condemn also keeps the acoustic
+    measure primary: the graded score reported for H2 is untouched by this, and
+    the agreement rate between the two signals is itself worth reporting as
+    part of validating the instrument.
+    """
     t = config.thresholds
     segmental_errors = [d for d in diagnoses if d.kind != "weak"]
 
@@ -224,6 +282,21 @@ def _classify(
         if stress is not None and stress.is_error:
             return "stress_error"
         return "correct"
+
+    supported = 0.0
+    if phone_scores:
+        supported = sum(
+            1 for p in phone_scores if p.score >= t.phone_error
+        ) / len(phone_scores)
+
+    if (config.trust_transcript and transcript_match
+            and supported >= config.transcript_rescue_min_phone_fraction):
+        # The recogniser heard the target word and the audio supports most of
+        # its phones: do not call this wrong.
+        if stress is not None and stress.is_error:
+            return "stress_error"
+        return "correct"
+
     if stress is not None and stress.is_error and not segmental_errors:
         return "stress_error"
     if score >= t.close:
@@ -237,27 +310,33 @@ def score_attempt(
     sample_rate: int,
     model: AcousticModel,
     config: PipelineConfig = DEFAULT_CONFIG,
+    transcript: str | None = None,
 ) -> AttemptScore:
     """Score one spoken attempt at ``word``.
 
     ``waveform`` is mono float32 in ``[-1, 1]`` at ``sample_rate``. Decoding and
     resampling belong to the transport layer, not here, so that this function
     stays testable without an audio codec.
+
+    ``transcript`` is the client's ASR output, when available. It is used only
+    as a guard against false negatives -- never to lower a score. See
+    :func:`_classify`.
     """
     timings = Timings()
     target = normalize_text(word)
 
     try:
         with timings.stage("lexicon"):
-            variants = pronunciations(target)
+            reference = reference_for(target, accent=config.accent)
     except ResourceUnavailable as exc:
         return _gated(target, "unscorable", str(exc), 0.0, timings, config)
-    if not variants:
+    if reference is None:
         return _gated(target, "unscorable",
                       f"no pronunciation known for {target!r}", 0.0, timings, config)
 
-    return score_phone_sequence(target, variants, waveform, sample_rate,
-                                model, config, timings)
+    return score_phone_sequence(target, reference.variants, waveform,
+                                sample_rate, model, config, timings,
+                                reference=reference, transcript=transcript)
 
 
 def score_phone_sequence(
@@ -268,6 +347,8 @@ def score_phone_sequence(
     model: AcousticModel,
     config: PipelineConfig = DEFAULT_CONFIG,
     timings: Timings | None = None,
+    reference: Reference | None = None,
+    transcript: str | None = None,
 ) -> AttemptScore:
     """Score audio against an explicit set of accepted phone sequences.
 
@@ -345,8 +426,17 @@ def score_phone_sequence(
                            gap_cost=config.gap_cost)
 
     with timings.stage("stress"):
+        # BEEP variants carry no stress marks, so the expected stress pattern
+        # comes from the reference's CMUdict-derived sequence when its length
+        # matches the aligned variant. Without that check a length mismatch
+        # would silently pair the wrong vowels together.
+        stress_reference = list(expected)
+        if reference is not None and reference.stress is not None:
+            if len(reference.stress) == len(expected):
+                stress_reference = list(reference.stress)
         stress = analyse_stress(
-            waveform, sample_rate, spans, list(expected), emissions.frame_stride_s,
+            waveform, sample_rate, spans, stress_reference,
+            emissions.frame_stride_s,
         )
 
     with timings.stage("classify"):
@@ -356,7 +446,10 @@ def score_phone_sequence(
             quantile=config.verdict_quantile, k=config.verdict_worst_k,
         )
         diagnoses = _diagnose(phone_scores, ops, config)
-        verdict = _classify(verdict_score, diagnoses, stress, config)
+        heard_target = transcript_matches_target(transcript, target, reference)
+        verdict = _classify(verdict_score, diagnoses, stress, config,
+                            transcript_match=heard_target,
+                            phone_scores=phone_scores)
 
     return AttemptScore(
         word=target,
@@ -373,6 +466,10 @@ def score_phone_sequence(
         stress=stress,
         n_variants_considered=len(variants),
         applied_folds=tuple(folds),
+        reference_source=reference.source.value if reference else None,
+        reference_needs_review=bool(reference and reference.needs_review),
+        transcript=transcript,
+        transcript_matches=heard_target,
         timings=timings,
         provenance=config.provenance(),
     )

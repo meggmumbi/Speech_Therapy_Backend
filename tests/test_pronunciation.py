@@ -20,9 +20,12 @@ from app.services.pronunciation import (PipelineConfig, StubAcousticModel,  # no
                                         align_phones, ctc_forced_align,
                                         differing_feature, phone_distance,
                                         pronunciations, score_attempt)
-from app.services.pronunciation.gop import (compute_phone_scores,  # noqa: E402
-                                            greedy_phone_decode, word_score)
-from app.services.pronunciation.align import attach_phones  # noqa: E402
+from app.services.pronunciation.gop import (blank_weights,  # noqa: E402
+                                            compute_phone_scores,
+                                            greedy_phone_decode,
+                                            phone_posteriors, word_score)
+from app.services.pronunciation.align import (attach_phones,  # noqa: E402
+                                              expand_spans)
 from app.services.pronunciation.lexicon import stress_pattern, syllabify  # noqa: E402
 
 SR = 16_000
@@ -144,8 +147,13 @@ def test_confident_correct_production_scores_high():
     model = StubAcousticModel(produced=phones, frames_per_phone=5, confidence=0.95)
     em = model.emissions(_waveform(), SR)
     ids = [em.phone_to_id[p] for p in phones]
-    spans = attach_phones(ctc_forced_align(em.log_probs, ids, em.blank_id), phones)
-    scores = compute_phone_scores(em.log_probs, spans, phones, em.phone_to_id, tau=1.0)
+    spans = expand_spans(
+        attach_phones(ctc_forced_align(em.log_probs, ids, em.blank_id), phones),
+        em.n_frames)
+    lp, p2i, _ = phone_posteriors(em.log_probs, em.phone_to_id)
+    scores = compute_phone_scores(lp, spans, phones, p2i, gop_floor=-10.0,
+                                  frame_weights=blank_weights(em.log_probs,
+                                                              em.blank_id))
 
     assert all(s.gop > -0.1 for s in scores)
     assert word_score(scores) > 0.9
@@ -157,8 +165,13 @@ def test_wrong_phone_is_scored_down_and_names_its_competitor():
     model = StubAcousticModel(produced=produced, frames_per_phone=5, confidence=0.95)
     em = model.emissions(_waveform(), SR)
     ids = [em.phone_to_id[p] for p in expected]
-    spans = attach_phones(ctc_forced_align(em.log_probs, ids, em.blank_id), expected)
-    scores = compute_phone_scores(em.log_probs, spans, expected, em.phone_to_id, tau=1.0)
+    spans = expand_spans(
+        attach_phones(ctc_forced_align(em.log_probs, ids, em.blank_id), expected),
+        em.n_frames)
+    lp, p2i, _ = phone_posteriors(em.log_probs, em.phone_to_id)
+    scores = compute_phone_scores(lp, spans, expected, p2i, gop_floor=-10.0,
+                                  frame_weights=blank_weights(em.log_probs,
+                                                              em.blank_id))
 
     th = scores[0]
     assert th.score < 0.5
@@ -199,7 +212,10 @@ def _score(word: str, produced: list[str], confidence: float = 0.95):
 
 
 def test_correct_production_is_scored_correct():
-    result = _score("draught", ["D", "R", "AE", "F", "T"])
+    # D R AA F T, not D R AE F T: the reference is British (BEEP), because
+    # Kenyan English is taught on British English. The American vowel is a
+    # near miss against that target, not a match.
+    result = _score("draught", ["D", "R", "AA", "F", "T"])
     assert result.verdict == "correct"
     assert result.is_correct
     assert result.score > 0.9
@@ -539,6 +555,129 @@ def test_best_scoring_variant_wins():
     )
     assert result.expected_phones[0] == "IY1"
     assert result.is_correct
+
+
+# --- reference lexicon ------------------------------------------------------
+
+def test_british_reference_is_used_by_default():
+    """CMUdict is General American; the study's speakers are taught British
+    English. Scoring a Kenyan speaker against an American target marked
+    correct productions wrong on the pilot."""
+    from app.services.pronunciation.references import (ReferenceSource,
+                                                       reference_for)
+    for word, expected_phone in (("mauve", "OW"), ("draught", "AA"),
+                                 ("tune", "Y")):
+        ref = reference_for(word)
+        assert ref is not None, word
+        assert ref.source == ReferenceSource.BEEP, (word, ref.source)
+        assert expected_phone in ref.primary, (word, ref.primary)
+
+
+def test_american_accent_can_still_be_selected():
+    from app.services.pronunciation.references import (ReferenceSource,
+                                                       reference_for)
+    ref = reference_for("mauve", accent="en-US")
+    assert ref is not None
+    assert ref.source == ReferenceSource.CMU
+    assert "AO1" in ref.primary
+
+
+def test_predicted_reference_is_flagged_for_review():
+    """A g2p-derived target has no authority behind it and must say so."""
+    from app.services.pronunciation.references import reference_for
+    ref = reference_for("zzzblorptik")
+    if ref is not None:
+        assert ref.needs_review
+
+
+def test_unreleased_final_stop_is_accepted():
+    """Word-final /p t k/ are often unreleased and emit no CTC peak, which
+    reads as a deletion the speaker did not make -- the reported "sheep" case.
+    """
+    from app.services.pronunciation.references import reference_for
+    forms = {tuple(v) for v in reference_for("sheep").variants}
+    assert ("SH", "IY", "P") in forms
+    assert ("SH", "IY") in forms
+
+
+def test_non_rhotic_rule_drops_postvocalic_r_only():
+    from app.services.pronunciation.references import non_rhotic
+    # car: post-vocalic R goes
+    assert non_rhotic(["K", "AA1", "R"]) == ["K", "AA1"]
+    # carry: R before a vowel stays
+    assert non_rhotic(["K", "AE1", "R", "IY0"]) is None
+    # letter: r-coloured schwa becomes plain schwa
+    assert non_rhotic(["L", "EH1", "T", "ER0"]) == ["L", "EH1", "T", "AH0"]
+
+
+def test_yod_rule_inserts_before_uw_after_alveolars():
+    from app.services.pronunciation.references import yod_retained
+    assert yod_retained(["T", "UW1", "N"]) == ["T", "Y", "UW1", "N"]
+    assert yod_retained(["M", "UW1", "N"]) is None
+
+
+def test_reference_source_is_reported_on_the_result():
+    result = _score("draught", ["D", "R", "AA", "F", "T"])
+    assert result.reference_source == "beep"
+    assert result.reference_needs_review is False
+
+
+# --- ASR transcript as a safety net ----------------------------------------
+
+def test_matching_transcript_rescues_a_wrongly_failed_attempt():
+    """The regression that mattered most: a volunteer told they got it wrong
+    when they did not. A matching transcript prevents that."""
+    from app.services.pronunciation import score_attempt
+    model = StubAcousticModel(produced=["D", "R", "AE", "F", "T"],
+                              frames_per_phone=5, confidence=0.95)
+    config = PipelineConfig(backend="stub")
+    audio = _waveform(0.5)
+
+    without = score_attempt("draught", audio, SR, model, config)
+    withit = score_attempt("draught", audio, SR, model, config,
+                           transcript="draught")
+    assert without.verdict != "correct"
+    assert withit.verdict == "correct"
+    assert withit.transcript_matches is True
+
+
+def test_non_matching_transcript_never_condemns():
+    """The transcript may only rescue. A disagreeing recogniser must not turn
+    an acoustically good attempt into a failure."""
+    from app.services.pronunciation import score_attempt
+    model = StubAcousticModel(produced=["D", "R", "AA", "F", "T"],
+                              frames_per_phone=5, confidence=0.95)
+    config = PipelineConfig(backend="stub")
+    audio = _waveform(0.5)
+
+    clean = score_attempt("draught", audio, SR, model, config)
+    with_bad = score_attempt("draught", audio, SR, model, config,
+                             transcript="something else entirely")
+    assert clean.verdict == "correct"
+    assert with_bad.verdict == "correct"
+    assert with_bad.transcript_matches is False
+
+
+def test_transcript_cannot_rescue_acoustically_absurd_audio():
+    """Guards against the recogniser auto-correcting something wildly wrong
+    into the target word."""
+    from app.services.pronunciation import score_attempt
+    model = StubAcousticModel(produced=["Z", "Z", "Z"], frames_per_phone=5,
+                              confidence=0.95)
+    config = PipelineConfig(backend="stub")
+    result = score_attempt("draught", _waveform(0.4), SR, model, config,
+                           transcript="draught")
+    assert result.verdict != "correct"
+
+
+def test_homophone_transcript_counts_as_a_match():
+    """"colonel" heard as "kernel" is the right word said right."""
+    from app.services.pronunciation.scoring import transcript_matches_target
+    from app.services.pronunciation.references import reference_for
+    ref = reference_for("colonel")
+    assert transcript_matches_target("kernel", "colonel", ref) is True
+    assert transcript_matches_target("banana", "colonel", ref) is False
+    assert transcript_matches_target(None, "colonel", ref) is None
 
 
 if __name__ == "__main__":

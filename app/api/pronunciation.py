@@ -96,6 +96,11 @@ async def score_pronunciation_attempt(
     item_id: uuid.UUID = Form(...),
     response_time_seconds: float = Form(...),
     audio: UploadFile = File(...),
+    # The client's on-device recogniser output, when it has one. Used only as
+    # a guard against telling a participant they were wrong when they were
+    # right; it can never make a verdict worse. Optional so the endpoint keeps
+    # working for clients that do not run an ASR.
+    transcript: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Score one spoken attempt and return the robot's next utterance."""
@@ -145,7 +150,7 @@ async def score_pronunciation_attempt(
 
     config = get_config()
     result = score_attempt(str(item.name), waveform, sample_rate,
-                           get_model(), config)
+                           get_model(), config, transcript=transcript)
 
     gated = result.verdict in ("gated", "unscorable")
     # Whether another attempt at this item follows. The client must not decide
@@ -189,6 +194,10 @@ async def score_pronunciation_attempt(
         stress_error=bool(result.stress and result.stress.is_error),
         named_phone=feedback.named_phone,
         feedback_word_count=feedback.word_count,
+        reference_source=result.reference_source,
+        reference_needs_review=result.reference_needs_review,
+        transcript=result.transcript,
+        transcript_matches=result.transcript_matches,
         audio_ref=audio_ref,
         pipeline_version=result.provenance.get("pipeline_version"),
         config_hash=result.provenance.get("config_hash"),
@@ -225,6 +234,9 @@ async def score_pronunciation_attempt(
         },
         "expected_phones": list(result.expected_phones),
         "observed_phones": list(result.observed_phones),
+        "reference_source": result.reference_source,
+        "reference_needs_review": result.reference_needs_review,
+        "transcript_matches": result.transcript_matches,
         "timings_ms": result.timings.stages,
         "note": result.note,
     }

@@ -96,6 +96,19 @@ def pronunciations(word: str) -> tuple[tuple[str, ...], ...]:
     return (tuple(p.upper() for p in predicted),) if predicted else ()
 
 
+def in_cmudict(word: str) -> bool:
+    """Whether ``word`` has a real dictionary entry rather than a prediction.
+
+    ``pronunciations`` falls back to g2p transparently, which is right for
+    scoring but hides provenance. Callers that record where a reference came
+    from need to be able to tell the two apart.
+    """
+    try:
+        return word.lower().strip() in _load_cmudict()
+    except ResourceUnavailable:
+        return False
+
+
 def canonical_pronunciation(word: str) -> tuple[str, ...]:
     """The first dictionary variant, for display and for stress reference."""
     variants = pronunciations(word)

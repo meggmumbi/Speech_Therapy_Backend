@@ -105,16 +105,29 @@ def phone_posteriors(
     return subset, new_phone_to_id, new_id_to_phone
 
 
-def gop_to_score(gop: float, tau: float) -> float:
-    """Map a GOP value (<= 0) onto ``[0, 1]``.
+def gop_to_score(gop: float, gop_floor: float) -> float:
+    """Map a GOP value (<= 0) onto ``[0, 1]`` by clipped linear rescaling.
 
-    ``exp(gop / tau)`` is monotone, bounded, and has no free intercept, so the
-    only fitted quantity is the temperature ``tau``. Calibrate it on
-    Speechocean762 against expert 0-2 phone scores before reporting anything.
+    ``score = 1 + gop / |gop_floor|``, clipped: 0 at the floor, 1 at GOP 0.
+
+    This replaces ``exp(gop / tau)``. Fitting tau on Speechocean762 drove it to
+    the top of every search range, which is the search telling us the
+    exponential is the wrong shape: ``exp(gop/tau)`` tends to a linear function
+    of GOP as tau grows, so what maximised correlation with human scores was
+    "stop compressing". Measured on 15,941 words with the L2-large model and
+    worst_k aggregation, correlation with expert word accuracy went from 0.366
+    under ``exp(gop)`` to 0.443 under this mapping, and word-level detection
+    AUC from 0.830 to 0.837.
+
+    A linear map has a second, structural advantage: it commutes with
+    averaging, so aggregating per-phone scores gives the same answer as
+    aggregating GOPs and mapping once. Under ``exp`` those two differ, and it
+    was never clear which the reported number meant.
     """
     if not math.isfinite(gop):
         return 0.0
-    return float(min(1.0, math.exp(gop / tau)))
+    span = abs(gop_floor) or 1.0
+    return float(min(1.0, max(0.0, 1.0 + gop / span)))
 
 
 def compute_phone_scores(
@@ -122,7 +135,7 @@ def compute_phone_scores(
     spans: Sequence[FrameSpan],
     expected_phones: Sequence[str],
     phone_to_id: Mapping[str, int],
-    tau: float,
+    gop_floor: float,
     frame_weights: np.ndarray | None = None,
     min_evidence: float = 0.05,
 ) -> list[PhoneScore]:
@@ -203,7 +216,7 @@ def compute_phone_scores(
 
         scores.append(PhoneScore(
             span.token_index, phone, span.start_frame, span.end_frame,
-            gop, gop_to_score(gop, tau), mean_post, competitor, comp_post,
+            gop, gop_to_score(gop, gop_floor), mean_post, competitor, comp_post,
         ))
     return scores
 
