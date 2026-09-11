@@ -187,6 +187,13 @@ class SessionAnalytics:
             )
             .join(models.ActivityItem, models.SessionActivity.item_id == models.ActivityItem.id)
             .join(models.TherapySession, models.SessionActivity.session_id == models.TherapySession.id)
+            # ActivityCategory was filtered on but never joined, so it entered
+            # the FROM clause as a cross join: every attempt count was
+            # multiplied by the number of categories of that type. The
+            # correct/total ratio survived (both sides inflated equally) but
+            # the raw counts did not.
+            .join(models.ActivityCategory,
+                  models.ActivityItem.category_id == models.ActivityCategory.id)
             .filter(models.TherapySession.child_id == child_id)
             .filter(models.ActivityCategory.type == 'personalized')
             .group_by(models.ActivityItem.category_id)
@@ -290,6 +297,13 @@ class SessionAnalytics:
             )
             .join(models.ActivityItem, models.SessionActivity.item_id == models.ActivityItem.id)
             .join(models.TherapySession, models.SessionActivity.session_id == models.TherapySession.id)
+            # ActivityCategory was filtered on but never joined, so it entered
+            # the FROM clause as a cross join: every attempt count was
+            # multiplied by the number of categories of that type. The
+            # correct/total ratio survived (both sides inflated equally) but
+            # the raw counts did not.
+            .join(models.ActivityCategory,
+                  models.ActivityItem.category_id == models.ActivityCategory.id)
             .filter(models.TherapySession.child_id == child_id)
             .filter(models.ActivityCategory.type == 'generic')
             .group_by(models.ActivityItem.category_id)

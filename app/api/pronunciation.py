@@ -15,7 +15,9 @@ path is validated against the rater-adjudicated sample.
 from __future__ import annotations
 
 import io
+import json
 import logging
+import math
 import uuid
 from dataclasses import asdict
 from datetime import datetime
@@ -23,6 +25,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -72,6 +75,31 @@ def _decode_wav(raw: bytes) -> tuple[np.ndarray, int]:
     return waveform, sample_rate
 
 
+def _json_safe(value):
+    """Replace non-finite floats with None, recursively.
+
+    ``PhoneScore.gop`` is ``-inf`` when a phone has no acoustic evidence at all
+    -- outside the model's inventory, zero-width span, or below the evidence
+    floor. That is meaningful in memory, but ``json.dumps`` renders it as
+    ``-Infinity``, which is not valid JSON, and PostgreSQL rejects it:
+
+        DataError: invalid input syntax for type json
+        DETAIL: Token "-Infinity" is invalid.
+
+    Every attempt containing such a phone failed to persist and returned 500
+    mid-session. Sanitising at the persistence boundary keeps the in-memory
+    value honest while writing something the column can hold; ``None`` reads
+    correctly in analysis as "no value", which is exactly what -inf meant.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
 def _persist_audio(raw: bytes, session_id: uuid.UUID, item_id: uuid.UUID,
                    attempt: int) -> str | None:
     """Write the recording to disk and return its reference.
@@ -88,6 +116,46 @@ def _persist_audio(raw: bytes, session_id: uuid.UUID, item_id: uuid.UUID,
     except OSError:
         log.exception("could not persist audio for session %s", session_id)
         return None
+
+
+def _quarantine_attempt(session_id, item_id, attempt_number, result,
+                        feedback, condition) -> None:
+    """Write an unpersistable attempt to disk so no data is lost.
+
+    Alongside the retained audio, so the attempt can be replayed into the
+    database once whatever blocked the write is fixed.
+    """
+    try:
+        directory = AUDIO_ROOT / str(session_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{item_id}_attempt{attempt_number}.quarantine.json"
+        payload = {
+            "session_id": str(session_id),
+            "item_id": str(item_id),
+            "attempt_number": attempt_number,
+            "condition": condition,
+            "word": result.word,
+            "verdict": result.verdict,
+            "is_correct": result.is_correct,
+            "score": result.score,
+            "verdict_score": result.verdict_score,
+            "confidence": result.confidence,
+            "expected_phones": list(result.expected_phones),
+            "observed_phones": list(result.observed_phones),
+            "phone_scores": [asdict(s) for s in result.phone_scores],
+            "diagnoses": [asdict(d) for d in result.diagnoses],
+            "reference_source": result.reference_source,
+            "transcript": result.transcript,
+            "transcript_matches": result.transcript_matches,
+            "feedback": feedback.speech,
+            "provenance": result.provenance,
+            "recorded_at": datetime.utcnow().isoformat(),
+        }
+        path.write_text(json.dumps(_json_safe(payload), indent=1),
+                        encoding="utf-8")
+        log.warning("attempt quarantined to %s", path)
+    except OSError:
+        log.exception("could not quarantine attempt; it is lost")
 
 
 @router.post("/sessions/{session_id}/attempts")
@@ -188,8 +256,8 @@ async def score_pronunciation_attempt(
         gated=gated,
         expected_phones=list(result.expected_phones),
         observed_phones=list(result.observed_phones),
-        phone_scores=[asdict(s) for s in result.phone_scores],
-        diagnoses=[asdict(d) for d in result.diagnoses],
+        phone_scores=_json_safe([asdict(s) for s in result.phone_scores]),
+        diagnoses=_json_safe([asdict(d) for d in result.diagnoses]),
         applied_folds=[list(f) for f in result.applied_folds],
         stress_error=bool(result.stress and result.stress.is_error),
         named_phone=feedback.named_phone,
@@ -202,15 +270,29 @@ async def score_pronunciation_attempt(
         pipeline_version=result.provenance.get("pipeline_version"),
         config_hash=result.provenance.get("config_hash"),
         model_id=result.provenance.get("model_id"),
-        stage_timings_ms=result.timings.stages,
+        stage_timings_ms=_json_safe(result.timings.stages),
         created_at=datetime.utcnow(),
     )
-    db.add(activity)
-    db.commit()
-    db.refresh(activity)
+
+    # A persistence failure must not cost the participant their turn. Log it,
+    # keep the payload on disk so the attempt is recoverable, and still return
+    # the feedback so the session continues.
+    attempt_id: str | None = None
+    try:
+        db.add(activity)
+        db.commit()
+        db.refresh(activity)
+        attempt_id = str(activity.id)
+    except SQLAlchemyError:
+        db.rollback()
+        log.exception("could not persist attempt for session %s item %s",
+                      session_id, item_id)
+        _quarantine_attempt(session_id, item_id, attempt_number, result,
+                            feedback, condition)
 
     return {
-        "attempt_id": str(activity.id),
+        "attempt_id": attempt_id,
+        "persisted": attempt_id is not None,
         "attempt_number": attempt_number,
         "condition": condition,
         "condition_source": condition_source,

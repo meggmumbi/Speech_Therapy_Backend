@@ -680,6 +680,32 @@ def test_homophone_transcript_counts_as_a_match():
     assert transcript_matches_target(None, "colonel", ref) is None
 
 
+# --- persistence ------------------------------------------------------------
+
+def test_non_finite_gop_serialises_to_valid_json():
+    """PhoneScore.gop is -inf when a phone has no acoustic evidence. Python
+    writes that as -Infinity, which is not valid JSON, and PostgreSQL rejects
+    it -- every such attempt 500'd mid-session."""
+    import json
+    from dataclasses import asdict
+
+    from app.api.pronunciation import _json_safe
+    from app.services.pronunciation.gop import PhoneScore
+
+    scores = [PhoneScore(0, "AO", 0, 0, float("-inf"), 0.0, 0.0, None, 0.0)]
+    payload = _json_safe([asdict(s) for s in scores])
+    encoded = json.dumps(payload)          # must not raise, must be valid JSON
+    assert "Infinity" not in encoded
+    assert json.loads(encoded)[0]["gop"] is None
+
+
+def test_json_safe_handles_nan_and_nesting():
+    from app.api.pronunciation import _json_safe
+    out = _json_safe({"a": float("nan"), "b": [float("inf"), 1.5],
+                      "c": {"d": float("-inf")}})
+    assert out == {"a": None, "b": [None, 1.5], "c": {"d": None}}
+
+
 if __name__ == "__main__":
     passed = failed = 0
     for name, fn in sorted(list(globals().items())):
