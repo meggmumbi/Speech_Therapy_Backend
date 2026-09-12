@@ -324,6 +324,86 @@ async def score_pronunciation_attempt(
     }
 
 
+@router.post("/analyze")
+async def analyze_audio(
+    word: str = Form(...),
+    audio: UploadFile = File(...),
+    transcript: str | None = Form(None),
+    condition: str = Form("D"),
+    db: Session = Depends(get_db),
+):
+    """Score audio against any word, with no session, item or database row.
+
+    A sandbox for checking the pipeline without a robot: record on a phone,
+    post the WAV, see the verdict, the per-phone scores and both conditions'
+    feedback. Nothing is persisted, so it cannot contaminate study data.
+
+    This is a development tool. It runs a model inference per request and does
+    not authenticate, so it belongs on a trusted network, not a public host.
+    """
+    if not is_ready():
+        raise HTTPException(503, "acoustic model is still loading")
+
+    raw = await audio.read()
+    if not raw:
+        raise HTTPException(400, "empty audio upload")
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "audio upload too large")
+
+    waveform, sample_rate = _decode_wav(raw)
+    config = get_config()
+    result = score_attempt(word, waveform, sample_rate, get_model(), config,
+                           transcript=transcript)
+
+    # Both conditions, so the wording of each can be compared side by side.
+    feedback = {
+        c: {
+            "speech": fb.speech,
+            "kind": fb.kind,
+            "word_count": fb.word_count,
+            "named_phone": fb.named_phone,
+        }
+        for c in ("K", "D")
+        for fb in [generate_feedback(result, word, c, attempt_index=0)]
+    }
+
+    return {
+        "word": result.word,
+        "verdict": result.verdict,
+        "is_correct": result.is_correct,
+        "score": result.score,
+        "verdict_score": result.verdict_score,
+        "confidence": result.confidence,
+        "gated": result.verdict in ("gated", "unscorable"),
+        "note": result.note,
+        "expected_phones": list(result.expected_phones),
+        "observed_phones": list(result.observed_phones),
+        "reference_source": result.reference_source,
+        "reference_needs_review": result.reference_needs_review,
+        "transcript": result.transcript,
+        "transcript_matches": result.transcript_matches,
+        "phone_scores": _json_safe([
+            {
+                "phone": p.phone,
+                "score": round(p.score, 3),
+                "gop": p.gop,
+                "competitor": p.competitor,
+                "frames": p.end_frame - p.start_frame,
+            }
+            for p in result.phone_scores
+        ]),
+        "diagnoses": _json_safe([
+            {"expected": d.expected, "observed": d.observed, "kind": d.kind,
+             "score": round(d.score, 3)}
+            for d in result.diagnoses
+        ]),
+        "stress_error": bool(result.stress and result.stress.is_error),
+        "feedback": feedback,
+        "timings_ms": _json_safe(result.timings.stages),
+        "audio_seconds": round(len(waveform) / sample_rate, 2),
+    }
+
+
 @router.get("/health")
 def pronunciation_health():
     """Whether scoring is available, and under exactly which configuration."""

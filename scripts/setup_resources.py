@@ -12,12 +12,31 @@ setup step that can fail loudly and be retried, not in the request path.
 
 from __future__ import annotations
 
+import os
 import sys
 
 REQUIRED = [
     ("corpora/cmudict", "cmudict"),
     ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng"),
 ]
+
+
+def download_model() -> int:
+    """Fetch the acoustic model into the local HuggingFace cache.
+
+    Run once per machine, with network access. Afterwards the server loads it
+    offline, which is both faster and the right behaviour for a study machine:
+    the model that scores an attempt should be the one that was validated.
+    """
+    os.environ["PRONUNCIATION_ALLOW_DOWNLOAD"] = "1"
+    from app.services.pronunciation.runtime import build_config, get_model
+
+    config = build_config()
+    print(f"  fetching {config.model_id} (~1.2 GB on first run) ...")
+    info = get_model().describe()
+    print(f"  ready: {info.n_labels} labels, "
+          f"{len(info.inventory)} mapped to ARPAbet")
+    return 0
 
 
 def main() -> int:
@@ -51,6 +70,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    import os
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    if "--download-model" in sys.argv:
+        raise SystemExit(download_model())
     raise SystemExit(main())

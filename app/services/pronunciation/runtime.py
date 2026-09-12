@@ -19,6 +19,28 @@ import logging
 import os
 import threading
 
+# Load the model from the local cache without contacting HuggingFace.
+#
+# Two reasons, and both bite in practice. On a network with TLS inspection the
+# freshness HEAD request fails certificate verification and retries five times
+# per file, so the server takes minutes to start even though the weights are
+# already on disk. And a study machine should not be reaching out mid-session
+# at all: the model that scores an attempt must be the one that was validated,
+# not whatever the hub is serving today.
+#
+# Set PRONUNCIATION_ALLOW_DOWNLOAD=1 to fetch a model the cache does not have;
+# scripts/setup_resources.py does this for you.
+if os.getenv("PRONUNCIATION_ALLOW_DOWNLOAD") != "1":
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+else:
+    try:
+        # The same proxy that breaks the freshness check breaks the download.
+        import truststore
+        truststore.inject_into_ssl()
+    except ImportError:
+        pass
+
 from .acoustic import AcousticModel, assert_phone_level, load_acoustic_model
 from .config import PipelineConfig
 
@@ -85,7 +107,10 @@ def warmup() -> None:
         log.info("acoustic model ready: %s, %d labels, %d mapped to ARPAbet",
                  info.model_id, info.n_labels, len(info.inventory))
     except Exception:  # noqa: BLE001 - start-up must not die on this
-        log.exception("acoustic model failed to load; scoring will be unavailable")
+        log.exception(
+            "acoustic model failed to load; scoring will be unavailable. "
+            "If the cache is empty, run: "
+            "python scripts/setup_resources.py --download-model")
 
 
 def is_ready() -> bool:
