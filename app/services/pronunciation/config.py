@@ -53,26 +53,36 @@ MODEL_CANDIDATES = {
 class Thresholds:
     """Decision boundaries. See ``provenance`` for what is fitted and what is not."""
 
-    # Verdict-score (worst_k, NOT the mean quality score) at or above which an
+    # Verdict-score (worst_k over per-phone scores) at or above which an
     # attempt counts as correct.
     #
-    # Fitted on Speechocean762 test (15,941 words, L2-large, worst_k k=2,
-    # linear GOP mapping with floor -10, 2026-09-07):
+    # Fitted on Speechocean762 *train* (15,827 words) and reported on *test*
+    # (15,941 words) through the full production path -- forced alignment,
+    # blank weighting, the MD layer, worst_k -- so the calibration matches what
+    # actually runs. Objective is Cost = 2*FPR + FNR (Vidal et al., CACM 2024),
+    # weighting a false correction twice a missed error.
     #
-    #     threshold  flagged%  sensitivity  specificity  precision
-    #     0.25       3.9       0.203        0.980        0.542
-    #     0.50       11.7      0.470        0.924        0.414
-    #     0.80       32.1      0.795        0.734        0.255   <- max Youden J
+    #     threshold 0.60: flags 15.6% (base rate 10.3%),
+    #                     FPR 0.110, FNR 0.436, Cost 0.655
     #
-    # 0.50 is chosen because it flags 11.7% against a true mispronunciation
-    # rate of 10.3% -- the verdict neither over- nor under-flags in aggregate,
-    # which is what keeps H1's "incorrect first attempt" denominator honest.
-    # Max Youden J sits at 0.80 but flags a third of all words at precision
-    # 0.255; for a tutor, wrongly telling a learner they were wrong is the
-    # more costly error, so specificity is favoured deliberately.
-    correct: float = 0.50
-    # Band below `correct` reported as "close" rather than plain wrong.
-    close: float = 0.30
+    # The previous 0.50 was fitted on the GOP score distribution. The MD layer
+    # emits calibrated probabilities that sit much higher (test median 0.811,
+    # p10 0.534), so the inherited threshold was far too low a bar and left
+    # correct attempts reading as "close".
+    correct: float = 0.60
+
+    # `close` is deliberately equal to `correct`, which makes the verdict a
+    # two-way correct/incorrect split.
+    #
+    # Fitting the two bands against two different gold definitions -- any
+    # imperfection (word accuracy < 10) versus a severe problem (<= 7) -- put
+    # BOTH optima at 0.60. The score does not separate "slightly off" from
+    # "badly wrong", so a middle band would be a label with no evidence behind
+    # it. Reported as a two-way verdict rather than dressed up as three.
+    #
+    # Note this is a display and analysis distinction only: feedback treats
+    # close and incorrect identically, so nothing the participant hears changes.
+    close: float = 0.60
     # Per-phone score below which a phone is flagged as a probable error.
     phone_error: float = 0.45
     # Articulatory distance above which a substitution is "gross" rather than
@@ -84,9 +94,9 @@ class Thresholds:
     confidence_gate: float = 0.35
 
     provenance: str = (
-        "PROVISIONAL. gop_floor and correct/close fitted on Speechocean762 "
-        "test (15,941 words, L2-large, worst_k k=2, linear GOP mapping, "
-        "2026-09-07); "
+        "correct/close fitted on Speechocean762 train, reported on test "
+        "(15,941 words) with the MD layer active, minimising Cost = 2*FPR+FNR "
+        "(2026-09-14); gop_floor fitted 2026-09-07; "
         "phone_error, gross_substitution and confidence_gate are still "
         "unfitted placeholders. Speechocean762 is L1-Mandarin speakers "
         "reading sentences, while the study is Kenyan English speakers on "
@@ -171,6 +181,13 @@ class PipelineConfig:
     # worst_k also beat mean on graded PCC, which mean was expected to win --
     # human 0-10 word accuracy is itself dominated by the worst phone, so the
     # "graded quality" construct is less mean-like than it sounds.
+    # Use the supervised mispronunciation-detection layer when one is
+    # trained. Measured on Speechocean762 test (47,368 phones): AUC 0.693 ->
+    # 0.830, Cost (2*FPR + FNR) 0.839 -> 0.678, missed errors 62% -> 39%.
+    # Turning this off restores pure GOP scoring, which is what every number
+    # before 2026-09-12 was computed with.
+    use_md_layer: bool = True
+
     quality_aggregation: str = "mean"
     verdict_aggregation: str = "worst_k"
     verdict_worst_k: int = 2

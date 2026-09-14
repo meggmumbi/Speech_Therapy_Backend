@@ -43,6 +43,8 @@ from .gop import (PhoneScore, aggregate_score, blank_weights,
                   compute_phone_scores, greedy_phone_decode, phone_posteriors,
                   utterance_confidence, word_score)
 from .lexicon import ResourceUnavailable, normalize_text
+from .md_features import word_positions
+from .md_scorer import load_md_layer
 from .references import Reference, ReferenceSource, reference_for
 from .prosody import StressAnalysis, analyse_stress
 
@@ -149,9 +151,14 @@ def _score_variant(
     # CTC peaks are one frame wide; widen them to real phone segments before
     # averaging anything over them.
     spans = expand_spans(spans, emissions.n_frames)
+    # Single words in the confirmatory study, so the whole variant is one
+    # word; position tells the layer whether a phone is word-initial, medial
+    # or final, which it learned to weight differently.
     phone_scores = compute_phone_scores(
         phone_log_probs, spans, list(variant), phone_to_id, config.gop_floor,
         frame_weights=frame_weights,
+        md_layer=load_md_layer() if config.use_md_layer else None,
+        positions=word_positions(len(variant)),
     )
     return (
         word_score(phone_scores, config.duration_weighted_score),
@@ -214,6 +221,33 @@ def _diagnose(
     return diagnoses
 
 
+def _corroborated_errors(diagnoses: Sequence[PhoneDiagnosis],
+                         phone_error: float) -> list[PhoneDiagnosis]:
+    """Errors the acoustic evidence actually supports.
+
+    An alignment-derived diagnosis on its own is not evidence. The free phone
+    decode is noisy in two specific, systematic ways:
+
+    * **Unreleased final stops emit no peak.** "Goat" scored G 1.0, OW 1.0,
+      T 1.0 -- and the decode still reported the T as deleted. A phone the
+      acoustic model is certain about cannot also be missing.
+    * **Aspiration decodes as an extra phone.** "Cow" produced an inserted W
+      between the aspirated /k/ and the vowel. There is no expected phone for
+      an insertion to score against, so an insertion carries no acoustic
+      evidence at all and can never, by itself, make a word wrong.
+
+    Requiring the expected phone to have *also* scored badly is the rule
+    ``_diagnose`` already describes but classification was not applying. Before
+    this, a correct production was reported as "close" whenever the decode
+    slipped -- which was nearly always, and is why volunteers were being told
+    they got words wrong that they had said perfectly well.
+    """
+    return [
+        d for d in diagnoses
+        if d.kind in ("substitution", "deletion") and d.score < phone_error
+    ]
+
+
 def transcript_matches_target(transcript: str | None, target: str,
                               reference: Reference | None) -> bool | None:
     """Did the client's ASR hear the target word?
@@ -274,7 +308,7 @@ def _classify(
     part of validating the instrument.
     """
     t = config.thresholds
-    segmental_errors = [d for d in diagnoses if d.kind != "weak"]
+    segmental_errors = _corroborated_errors(diagnoses, t.phone_error)
 
     if score >= t.correct and not segmental_errors:
         # Correct segmentally; a stress error still makes the word wrong, and

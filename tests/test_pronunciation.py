@@ -205,9 +205,18 @@ def test_normalisation_spells_out_digits():
 # --- end to end -------------------------------------------------------------
 
 def _score(word: str, produced: list[str], confidence: float = 0.95):
+    """Score with the stub, on pure GOP.
+
+    The MD layer is disabled here deliberately. It was fitted on real speech,
+    and the stub synthesises emissions, so its feature vectors are out of
+    distribution for the layer -- its output on them would be arbitrary, and a
+    test asserting anything about it would be testing noise. Verdict and
+    feedback logic are exercised on GOP, where the stub is deterministic;
+    md_scorer has its own tests.
+    """
     model = StubAcousticModel(produced=produced, frames_per_phone=5,
                               confidence=confidence)
-    config = PipelineConfig(backend="stub")
+    config = PipelineConfig(backend="stub", use_md_layer=False)
     return score_attempt(word, _waveform(len(produced) * 5 * 0.02), SR, model, config)
 
 
@@ -456,7 +465,7 @@ def test_quality_and_verdict_scores_are_reported_separately():
     """H2 needs graded quality, H1 needs a verdict; one number cannot be both."""
     model = StubAcousticModel(produced=["K", "AE", "T"], frames_per_phone=5,
                               confidence=0.95)
-    config = PipelineConfig(backend="stub")
+    config = PipelineConfig(backend="stub", use_md_layer=False)
     result = score_attempt("cat", _waveform(0.3), SR, model, config)
     assert result.score > 0.0
     assert result.verdict_score > 0.0
@@ -630,7 +639,7 @@ def test_matching_transcript_rescues_a_wrongly_failed_attempt():
     from app.services.pronunciation import score_attempt
     model = StubAcousticModel(produced=["D", "R", "AE", "F", "T"],
                               frames_per_phone=5, confidence=0.95)
-    config = PipelineConfig(backend="stub")
+    config = PipelineConfig(backend="stub", use_md_layer=False)
     audio = _waveform(0.5)
 
     without = score_attempt("draught", audio, SR, model, config)
@@ -647,7 +656,7 @@ def test_non_matching_transcript_never_condemns():
     from app.services.pronunciation import score_attempt
     model = StubAcousticModel(produced=["D", "R", "AA", "F", "T"],
                               frames_per_phone=5, confidence=0.95)
-    config = PipelineConfig(backend="stub")
+    config = PipelineConfig(backend="stub", use_md_layer=False)
     audio = _waveform(0.5)
 
     clean = score_attempt("draught", audio, SR, model, config)
@@ -664,7 +673,7 @@ def test_transcript_cannot_rescue_acoustically_absurd_audio():
     from app.services.pronunciation import score_attempt
     model = StubAcousticModel(produced=["Z", "Z", "Z"], frames_per_phone=5,
                               confidence=0.95)
-    config = PipelineConfig(backend="stub")
+    config = PipelineConfig(backend="stub", use_md_layer=False)
     result = score_attempt("draught", _waveform(0.4), SR, model, config,
                            transcript="draught")
     assert result.verdict != "correct"
@@ -704,6 +713,79 @@ def test_json_safe_handles_nan_and_nesting():
     out = _json_safe({"a": float("nan"), "b": [float("inf"), 1.5],
                       "c": {"d": float("-inf")}})
     assert out == {"a": None, "b": [None, 1.5], "c": {"d": None}}
+
+
+
+# --- supervised MD layer ----------------------------------------------------
+
+def test_md_layer_absent_falls_back_to_gop():
+    """A missing model must degrade to GOP, not break scoring."""
+    from pathlib import Path
+
+    from app.services.pronunciation import md_scorer
+    md_scorer.reset()
+    try:
+        assert md_scorer.load_md_layer(Path("data/does-not-exist.joblib")) is None
+    finally:
+        md_scorer.reset()
+
+
+def test_md_layer_scores_are_probabilities_and_beat_gop_on_record():
+    """If a trained layer is present, it must produce calibrated scores and
+    carry the held-out numbers that justify using it."""
+    from app.services.pronunciation import md_scorer
+    md_scorer.reset()
+    layer = md_scorer.load_md_layer()
+    if layer is None:
+        return                       # not trained on this machine; nothing to check
+    try:
+        assert len(layer.inventory) > 30
+        # Provenance: the layer records what it measured against GOP.
+        auc = layer.metrics.get("auc")
+        baseline = layer.metrics.get("baseline_gop_auc")
+        assert auc is not None and baseline is not None
+        assert auc > baseline, (auc, baseline)
+
+        from app.services.pronunciation.md_features import FEATURE_NAMES
+        features = [0.0] * len(FEATURE_NAMES)
+        score = layer.score(features, layer.inventory[0])
+        assert score is not None and 0.0 <= score <= 1.0
+        # A phone the layer never saw must decline rather than guess.
+        assert layer.score(features, "NOT_A_PHONE") is None
+    finally:
+        md_scorer.reset()
+
+
+def test_md_feature_vector_matches_the_declared_names():
+    """Training and serving share this function; a length mismatch here is a
+    silent train/serve skew."""
+    from app.services.pronunciation.md_features import (FEATURE_NAMES,
+                                                        phone_feature_vector)
+    from app.services.pronunciation.align import attach_phones, ctc_forced_align, expand_spans
+    from app.services.pronunciation.gop import blank_weights, phone_posteriors
+
+    phones = ["K", "AE", "T"]
+    model = StubAcousticModel(produced=phones, frames_per_phone=5)
+    em = model.emissions(_waveform(), SR)
+    ids = [em.phone_to_id[p] for p in phones]
+    spans = expand_spans(
+        attach_phones(ctc_forced_align(em.log_probs, ids, em.blank_id), phones),
+        em.n_frames)
+    lp, p2i, _ = phone_posteriors(em.log_probs, em.phone_to_id)
+    weights = blank_weights(em.log_probs, em.blank_id)
+
+    vector = phone_feature_vector(lp, weights, spans[0], p2i["K"], "K", 0)
+    assert vector is not None
+    assert len(vector) == len(FEATURE_NAMES)
+    assert all(isinstance(v, float) for v in vector)
+
+
+def test_word_positions_marks_first_and_last():
+    from app.services.pronunciation.md_features import word_positions
+    assert word_positions(1) == [0]
+    assert word_positions(2) == [0, 2]
+    assert word_positions(4) == [0, 1, 1, 2]
+    assert word_positions(0) == []
 
 
 if __name__ == "__main__":

@@ -1,0 +1,27 @@
+{
+  "use_md_layer": true,
+  "fp_weight": 2.0,
+  "n_fit_words": 15827,
+  "n_test_words": 15941,
+  "correct": {
+    "threshold": 0.6,
+    "gold": "word accuracy < 10",
+    "base_rate": 0.10287936766827677,
+    "flag_rate": 0.15632645379838153,
+    "fpr": 0.10957275714984967,
+    "fnr": 0.43597560975609756,
+    "cost": 0.6551211240557969,
+    "fit_cost": 0.5557705118832161
+  },
+  "close": {
+    "threshold": 0.6,
+    "gold": "word accuracy <= 7",
+    "base_rate": 0.08249168809986826,
+    "flag_rate": 0.15632645379838153,
+    "fpr": 0.117598796663476,
+    "fnr": 0.4129277566539924,
+    "cost": 0.6481253499809444,
+    "fit_cost": 0.5366324152692191
+  },
+  "bands_collapsed": true
+}

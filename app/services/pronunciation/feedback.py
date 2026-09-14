@@ -172,6 +172,10 @@ MOVE_ON = "The word is {word}. Let's go on to the next one."
 
 _ORDINALS = ("first", "second", "third", "fourth", "fifth", "sixth")
 
+# A phone scoring at or above this is not worth correcting, whatever the
+# alignment says about it. Kept in step with Thresholds.phone_error.
+NAMEABLE_SCORE_CEILING = 0.45
+
 
 @dataclass(frozen=True)
 class Feedback:
@@ -248,10 +252,15 @@ def primary_diagnosis(result: AttemptScore) -> PhoneDiagnosis | None:
     a learner can act on and more exposed to the precision limits -- naming
     three phones means three chances to be wrong.
     """
+    # Only name a sound the acoustics agree was weak. Naming a phone that
+    # scored 1.0 -- which the raw decode routinely reports as deleted when a
+    # final stop is unreleased -- tells the learner to fix something they did
+    # correctly, which is worse than saying nothing specific at all.
     nameable = [
         d for d in result.diagnoses
         if d.kind in ("substitution", "weak", "deletion")
         and strip_stress(d.expected) in PHONE_EXEMPLARS
+        and d.score < NAMEABLE_SCORE_CEILING
     ]
     if not nameable:
         return None

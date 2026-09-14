@@ -46,6 +46,9 @@ class PhoneScore:
     mean_posterior: float       # mean P(expected phone | frame) over the span
     competitor: str | None      # phone the model found most likely instead
     competitor_posterior: float
+    # Supervised score from the MD layer, when one is loaded. None means the
+    # phone fell back to GOP -- outside the layer's inventory, or no layer.
+    md_score: float | None = None
 
     @property
     def realised(self) -> bool:
@@ -138,6 +141,8 @@ def compute_phone_scores(
     gop_floor: float,
     frame_weights: np.ndarray | None = None,
     min_evidence: float = 0.05,
+    md_layer=None,
+    positions: Sequence[int] | None = None,
 ) -> list[PhoneScore]:
     """Score every expected phone over the frames forced alignment gave it.
 
@@ -214,9 +219,29 @@ def compute_phone_scores(
         comp_post = float(np.average(np.exp(window[:, competitor_id]),
                                      weights=weights))
 
+        # The supervised layer, when available, replaces the GOP-derived
+        # score. GOP was measured at AUC 0.693 on Speechocean762 against the
+        # layer's 0.830, and the layer is calibrated to human ratings rather
+        # than to a hand-set mapping. GOP stays on the record either way.
+        score = gop_to_score(gop, gop_floor)
+        md_score = None
+        if md_layer is not None and frame_weights is not None:
+            from .md_features import phone_feature_vector
+            position = (positions[span.token_index]
+                        if positions is not None
+                        and span.token_index < len(positions) else 1)
+            bare = _lookup_key(phone, phone_to_id)
+            features = phone_feature_vector(
+                log_probs, frame_weights, span, pid, bare, position,
+                duration_stats=md_layer.duration_stats)
+            if features is not None:
+                md_score = md_layer.score(features, bare)
+                if md_score is not None:
+                    score = md_score
+
         scores.append(PhoneScore(
             span.token_index, phone, span.start_frame, span.end_frame,
-            gop, gop_to_score(gop, gop_floor), mean_post, competitor, comp_post,
+            gop, score, mean_post, competitor, comp_post, md_score,
         ))
     return scores
 
