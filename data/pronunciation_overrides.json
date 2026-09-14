@@ -1,16 +1,25 @@
 {
   "_README": [
-    "Hand-set expected pronunciations, in ARPAbet, highest precedence of all",
-    "reference layers. Use this for items where BEEP is wrong or contested, or",
-    "where the study is deliberately teaching one particular form.",
+    "Hand-set expected pronunciations, ARPAbet, highest precedence of all",
+    "reference layers. Use for items where the dictionary is absent or wrong,",
+    "or where the study teaches one particular form.",
     "",
     "Format:  \"word\": \"PH ON ES\"   or   \"word\": [\"FORM ONE\", \"FORM TWO\"]",
-    "Several forms are all ACCEPTED - scoring takes the best-matching one.",
-    "Stress digits are optional and ignored for segmental scoring.",
+    "Several forms are all ACCEPTED - scoring keeps the best-matching one.",
     "",
-    "Edit this file and restart, or call references.reload_sources().",
-    "Anything listed here should be signed off by whoever decides what the",
-    "study teaches - the pipeline will score against it without question."
+    "Edit and restart, or call references.reload_sources().",
+    "Entries here are scored without question, so they should be signed off by",
+    "whoever decides what the study teaches."
   ],
-  "_EXAMPLE_niche": ["N IY SH", "N IH CH"]
+
+  "_why_tuktuk": "Kenyan English, absent from BEEP and CMUdict. g2p predicted 'T AH1 T K AH0' (roughly 'tutka'), which failed both study attempts on a reference error rather than a pronunciation error.",
+  "tuktuk": ["T UH K T UH K", "T AH K T AH K"],
+
+  "_why_quinoa": "Absent from BEEP. g2p gave 'K W IH1 N OW0' (kwih-noh), but the robot's own prompt teaches 'keen-waa'. Scoring against a form the participant was never taught is not a pronunciation test.",
+  "quinoa": ["K IY N W AA", "K W IY N OW AH", "K IH N W AA"],
+
+  "_why_bodaboda": "Kenyan English for a motorbike taxi; used in the Vehicles prompts.",
+  "bodaboda": ["B OW D AH B OW D AH"],
+  "matatu": ["M AH T AA T UW"],
+  "mkokoteni": ["M K OW K OW T EH N IY"]
 }

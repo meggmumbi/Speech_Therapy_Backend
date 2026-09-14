@@ -47,7 +47,7 @@ BEEP_PATH = Path("data/beep.tsv.gz")
 OVERRIDES_PATH = Path("data/pronunciation_overrides.json")
 
 # Bound the work: each variant costs a forced-alignment and GOP pass.
-MAX_VARIANTS = 8
+MAX_VARIANTS = 12
 
 
 class ReferenceSource(str, Enum):
@@ -144,6 +144,78 @@ def optional_final_stop(phones: list[str]) -> list[str] | None:
     if strip_stress(phones[-1]) in ("P", "T", "K"):
         return phones[:-1]
     return None
+
+
+def non_rhotic_nurse(phones: list[str]) -> list[list[str]]:
+    """Accept how an American-trained model hears British /3:/ (NURSE).
+
+    BEEP writes ``er`` for the NURSE vowel, but ARPAbet ``ER`` is the American
+    *r-coloured* vowel. A model trained on American English hearing a
+    non-rhotic /3:/ has no ER-like rhoticity to latch onto and decodes it as AA
+    or AH.
+
+    Measured on the study recordings: "hyperbole" produced
+    ``HH AY P AA B L IH`` against an expected ``HH AY P ER B AH L IY``, and
+    "turquoise" ``T AA K W IY S`` against ``T ER K W OY Z``. Both are correct
+    Kenyan English and both were marked wrong -- every NURSE word was.
+
+    Emitting the AA and AH realisations as accepted variants fixes that. The
+    cost is that a genuine NURSE error is no longer detectable; but it never
+    was, because the phone inventory cannot represent the contrast. This makes
+    an existing blind spot explicit instead of scoring correct speech as wrong.
+    """
+    out: list[list[str]] = []
+    if not any(strip_stress(p) == "ER" for p in phones):
+        return out
+    for replacement in ("AA", "AH"):
+        out.append([replacement if strip_stress(p) == "ER" else p
+                    for p in phones])
+    return out
+
+
+def optional_yod(phones: list[str]) -> list[str] | None:
+    """Accept the yod-dropped form as well as the yod-retained one.
+
+    BEEP gives "pseudonym" as ``s y uw d ax n ih m`` and "ingenuity" with the
+    yod. Both were produced without it in the study recordings and marked
+    wrong. Yod-dropping is widespread in every variety of English, so both are
+    legitimate; accepting one and not the other penalises a real pronunciation.
+    """
+    out: list[str] = []
+    changed = False
+    for i, phone in enumerate(phones):
+        if (strip_stress(phone) == "Y" and i > 0
+                and strip_stress(phones[i - 1]) in _YOD_AFTER
+                and i + 1 < len(phones)
+                and strip_stress(phones[i + 1]) == "UW"):
+            changed = True
+            continue
+        out.append(phone)
+    return out if changed else None
+
+
+def realisation_variants(form: tuple[str, ...]) -> list[tuple[str, ...]]:
+    """Accepted ways one reference form can legitimately surface.
+
+    Applied to every reference regardless of which lexicon layer produced it,
+    because these are facts about how the acoustic model hears British English
+    rather than facts about any one dictionary.
+    """
+    out: list[tuple[str, ...]] = []
+    base = list(form)
+
+    for variant in non_rhotic_nurse(base):
+        out.append(tuple(variant))
+    dropped = optional_yod(base)
+    if dropped:
+        out.append(tuple(dropped))
+        # Both adjustments at once: "turquoise" style words can need either.
+        for variant in non_rhotic_nurse(dropped):
+            out.append(tuple(variant))
+    trimmed = optional_final_stop(base)
+    if trimmed:
+        out.append(tuple(trimmed))
+    return out
 
 
 def british_variants(phones: tuple[str, ...]) -> list[tuple[str, ...]]:
@@ -264,10 +336,8 @@ def reference_for(word: str, accent: str = "en-GB") -> Reference | None:
         beep = _load_beep().get(target)
         if beep:
             variants = list(beep)
-            for form in list(variants):
-                extra = optional_final_stop(list(form))
-                if extra:
-                    variants.append(tuple(extra))
+            for form in list(beep):
+                variants.extend(realisation_variants(form))
             return finish(variants, ReferenceSource.BEEP)
 
     if cmu and not real_entry:
@@ -280,9 +350,7 @@ def reference_for(word: str, accent: str = "en-GB") -> Reference | None:
             for form in list(cmu):
                 variants.extend(british_variants(form))
             for form in list(variants):
-                extra = optional_final_stop(list(form))
-                if extra:
-                    variants.append(tuple(extra))
+                variants.extend(realisation_variants(form))
             source = (ReferenceSource.CMU_ADAPTED
                       if len(variants) > len(cmu) else ReferenceSource.CMU)
         else:
