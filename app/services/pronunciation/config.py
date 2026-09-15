@@ -181,6 +181,55 @@ class PipelineConfig:
     # worst_k also beat mean on graded PCC, which mean was expected to win --
     # human 0-10 word accuracy is itself dominated by the worst phone, so the
     # "graded quality" construct is less mean-like than it sounds.
+    #
+    # A 2026-09-14 investigation into advanced polysyllabic stimuli tested
+    # whether worst_k is LENGTH-BIASED -- it takes a fixed two phones however
+    # long the word is, so the worst 2 of 11 draws is a harsher test than the
+    # worst 2 of 3. It is, and worst_k still ships. Both halves matter:
+    #
+    # The bias is real. On the 15,941 human-scored test words, restricted to
+    # words raters gave a PERFECT 10 (so every flag is a false alarm), at the
+    # fitted 0.60 threshold through the full MD path:
+    #
+    #     phones    1-2     3       4      5      6      7+
+    #     flagged   6.3%   14.4%  15.1%  15.9%  16.0%  15.4%
+    #
+    # A multi-syllable word is ~2.4x more likely to be failed while correct
+    # than a monosyllable. quantile 0.15 inverts that (12.1% short, 2.9% long).
+    #
+    # But switching to quantile was tried and REVERTED, because it buys the
+    # even profile with real detection power:
+    #
+    #     matched FPR 0.110    FNR      Cost     AUC
+    #     worst_k k=2          0.436    0.655    0.839
+    #     quantile 0.15        0.504    0.724    0.813
+    #
+    # and buys nothing where it was supposed to. Restricted to the 5+ phone
+    # words the study actually uses (n=1531, threshold fitted on half and
+    # evaluated on the other half) the two are indistinguishable -- worst_k
+    # Cost 0.712 / AUC 0.8206, quantile 0.730 / AUC 0.8229. Paying 0.07 of FNR
+    # across the board for a tie on the words of interest is a bad trade.
+    #
+    # Per-length-band thresholds were also tried and rejected: Cost 0.685
+    # against 0.637 for a single global threshold. Only 341 test words have 7+
+    # phones, so the long bands overfit, exactly as the per-phone thresholds
+    # did in scripts/train_md_layer.py.
+    #
+    # What DOES follow: the operating point belongs to the stimulus set. On 5+
+    # phone words the cost-optimal worst_k threshold is 0.485, not 0.630, and
+    # at 0.485 the false-correction rate on those words falls from 0.140 to
+    # 0.066. A study whose items are all advanced words should calibrate on
+    # advanced words rather than inherit a threshold fitted on a corpus that is
+    # 70% one- and two-syllable words.
+    #
+    # Two traps this investigation fell into, recorded so the next one does not:
+    # scripts/check_length_bias.py reads the PRE-MD per-phone GOP scores, where
+    # quantile beats worst_k on Cost (0.683 vs 0.708). The MD layer reverses
+    # that ranking. Any aggregation conclusion must be confirmed through
+    # scripts/fit_verdict_thresholds.py on the full path before it is acted on.
+    # And the original 2026-09-03 sweep missed the bias entirely because 70% of
+    # Speechocean762 is 2-3 phone words; fit_verdict_thresholds.py now prints
+    # false alarms by word length on every run.
     # Use the supervised mispronunciation-detection layer when one is
     # trained. Measured on Speechocean762 test (47,368 phones): AUC 0.693 ->
     # 0.830, Cost (2*FPR + FNR) 0.839 -> 0.678, missed errors 62% -> 39%.
@@ -191,6 +240,8 @@ class PipelineConfig:
     quality_aggregation: str = "mean"
     verdict_aggregation: str = "worst_k"
     verdict_worst_k: int = 2
+    # Only used if verdict_aggregation is switched to "quantile", which the
+    # comment above explains was tried and reverted.
     verdict_quantile: float = 0.15
 
     thresholds: Thresholds = field(default_factory=Thresholds)

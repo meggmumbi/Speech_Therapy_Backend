@@ -461,12 +461,29 @@ def score_phone_sequence(
 
     with timings.stage("stress"):
         # BEEP variants carry no stress marks, so the expected stress pattern
-        # comes from the reference's CMUdict-derived sequence when its length
-        # matches the aligned variant. Without that check a length mismatch
-        # would silently pair the wrong vowels together.
+        # comes from the reference's CMUdict-derived sequence -- but only when
+        # that sequence is the same pronunciation, phone for phone.
+        #
+        # Matching on length alone was not enough. CMUdict is American, and
+        # where British and American English stress a word differently they
+        # usually differ segmentally too, at the same number of phones. So
+        # "debris" took the American "D AH0 B R IY1" (second-syllable stress,
+        # reduced first vowel) and laid it over the British "D EY B R IY"
+        # ("DAY-bree", first-syllable stress) -- same length, different word --
+        # and then reported a stress error against a British speaker saying it
+        # correctly. Both study attempts were flagged this way.
+        #
+        # The same trap is set for research, adult, princess, garage, ballet,
+        # brochure and cafe, and for any word whose accepted realisation went
+        # through a variant rule: once the vowels have been rewritten, CMUdict
+        # marks no longer describe the form being scored.
+        #
+        # When the sequences disagree we decline to judge stress at all rather
+        # than judge it against the wrong pronunciation.
         stress_reference = list(expected)
         if reference is not None and reference.stress is not None:
-            if len(reference.stress) == len(expected):
+            cmu_bare = [strip_stress(p) for p in reference.stress]
+            if cmu_bare == [strip_stress(p) for p in expected]:
                 stress_reference = list(reference.stress)
         stress = analyse_stress(
             waveform, sample_rate, spans, stress_reference,

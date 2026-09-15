@@ -92,6 +92,8 @@ def score_split(split: str, config: PipelineConfig, limit: int | None):
     ds = load_corpus(split, limit)
     print(f"  {len(ds)} utterances in {split}")
 
+    phone_counts: list[int] = []
+
     verdict_scores: list[float] = []
     word_accuracy: list[float] = []
 
@@ -145,11 +147,13 @@ def score_split(split: str, config: PipelineConfig, limit: int | None):
                 duration_weighted=config.duration_weighted_score,
                 quantile=config.verdict_quantile, k=config.verdict_worst_k))
             word_accuracy.append(float(accuracy))
+            phone_counts.append(len(window))
 
         if (n + 1) % 500 == 0:
             print(f"    {n + 1}/{len(ds)}", flush=True)
 
-    return np.asarray(verdict_scores), np.asarray(word_accuracy)
+    return (np.asarray(verdict_scores), np.asarray(word_accuracy),
+            np.asarray(phone_counts))
 
 
 def main() -> int:
@@ -158,19 +162,49 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-md", action="store_true",
                         help="calibrate pure GOP instead, for comparison")
+    # Aggregation is an argument rather than only a config default so that two
+    # candidates can be compared on the SAME path -- forced alignment, blank
+    # weighting, MD layer and all -- without mutating config between runs and
+    # without either run overwriting the other's output.
+    parser.add_argument("--aggregation", default=None,
+                        choices=["worst_k", "quantile", "mean", "min", "softmin"],
+                        help="override config.verdict_aggregation")
+    parser.add_argument("--worst-k", type=int, default=None)
+    parser.add_argument("--quantile", type=float, default=None)
     args = parser.parse_args()
 
     warmup()
+    overrides = {}
+    if args.aggregation is not None:
+        overrides["verdict_aggregation"] = args.aggregation
+    if args.worst_k is not None:
+        overrides["verdict_worst_k"] = args.worst_k
+    if args.quantile is not None:
+        overrides["verdict_quantile"] = args.quantile
     config = PipelineConfig(backend="torch", max_audio_seconds=30.0,
-                            use_md_layer=not args.no_md)
-    print(f"scoring with use_md_layer={config.use_md_layer}")
+                            use_md_layer=not args.no_md, **overrides)
+
+    # Each aggregation writes its own file. An earlier version wrote one fixed
+    # path, so comparing two candidates meant the second run silently replaced
+    # the evidence for the first.
+    detail = (f"k{config.verdict_worst_k}" if config.verdict_aggregation == "worst_k"
+              else f"q{config.verdict_quantile:g}"
+              if config.verdict_aggregation == "quantile" else "")
+    out = OUT.with_name(f"{OUT.stem}-{config.verdict_aggregation}{detail}"
+                        f"{'-gop' if args.no_md else ''}.json")
+    print(f"scoring with use_md_layer={config.use_md_layer}, "
+          f"aggregation={config.verdict_aggregation}{detail}")
+    print(f"will write {out}")
 
     print("fitting on train ...")
-    fit_scores, fit_acc = score_split("train", config, args.limit)
+    fit_scores, fit_acc, _ = score_split("train", config, args.limit)
     print("evaluating on test ...")
-    test_scores, test_acc = score_split("test", config, args.limit)
+    test_scores, test_acc, test_n = score_split("test", config, args.limit)
 
     results = {"use_md_layer": config.use_md_layer,
+               "aggregation": config.verdict_aggregation,
+               "worst_k": config.verdict_worst_k,
+               "quantile": config.verdict_quantile,
                "fp_weight": args.fp_weight,
                "n_fit_words": int(len(fit_scores)),
                "n_test_words": int(len(test_scores))}
@@ -204,6 +238,41 @@ def main() -> int:
                          "flag_rate": rate, "fpr": fpr, "fnr": fnr,
                          "cost": cost, "fit_cost": fit_cost}
 
+    # False alarms by word length, on words the raters scored a PERFECT 10 --
+    # so every flag counted here is the pipeline being wrong. This report
+    # exists because the 2026-09-03 aggregation sweep chose worst_k on
+    # aggregate AUC while worst_k was quietly failing long words twice as
+    # often as short ones, and 70% of this corpus is 2-3 phone words so the
+    # aggregate never showed it. A flat row here is the thing to check before
+    # trusting any aggregation choice.
+    perfect = test_acc >= 10
+    t_correct = results["correct"]["threshold"]
+    print(f"\nfalse alarms by word length, at the fitted correct threshold "
+          f"({t_correct:.2f})")
+    print(f"  words the raters scored a perfect 10, so every flag is wrong")
+    print(f"  {'phones':<10}{'n':<8}{'mean score':<13}{'falsely flagged'}")
+    print("  " + "-" * 48)
+    by_length = {}
+    for lo, hi in [(1, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 40)]:
+        m = perfect & (test_n >= lo) & (test_n <= hi)
+        if int(m.sum()) < 30:
+            continue
+        label = f"{lo}" if lo == hi else f"{lo}-{hi}" if hi < 40 else f"{lo}+"
+        rate = float((test_scores[m] < t_correct).mean())
+        by_length[label] = {"n": int(m.sum()), "false_alarm_rate": rate,
+                            "mean_score": float(test_scores[m].mean())}
+        print(f"  {label:<10}{int(m.sum()):<8}{test_scores[m].mean():<13.3f}"
+              f"{rate:.1%}")
+    results["false_alarms_by_length"] = by_length
+    if len(by_length) >= 2:
+        rates = [v["false_alarm_rate"] for v in by_length.values()]
+        spread = max(rates) - min(rates)
+        results["length_bias_spread"] = spread
+        print(f"\n  spread across lengths: {spread:+.1%}", end="  ")
+        print("-- acceptable" if spread < 0.10 else
+              "-- LENGTH BIASED. This aggregation punishes words for being "
+              "long, not for being mispronounced.")
+
     if results["close"]["threshold"] >= results["correct"]["threshold"]:
         print("\n!  close >= correct: the bands have collapsed. Report the "
               "verdict as a two-way correct/incorrect split rather than "
@@ -212,15 +281,16 @@ def main() -> int:
 
     # Keep the raw arrays: re-asking a threshold question should cost a file
     # read, not another full pass over the corpus.
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+    out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
-        OUT.with_suffix(".npz"),
+        out.with_suffix(".npz"),
         fit_scores=fit_scores, fit_accuracy=fit_acc,
         test_scores=test_scores, test_accuracy=test_acc,
+        test_phone_counts=test_n,
     )
-    print(f"wrote {OUT.with_suffix('.npz')} (raw scores for re-analysis)")
-    OUT.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(f"\nwrote {OUT}")
+    print("wrote " + str(out.with_suffix(".npz")) + " (raw scores for re-analysis)")
+    out.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    print("wrote " + str(out))
     print("Apply by setting Thresholds.correct / Thresholds.close in "
           "app/services/pronunciation/config.py")
     return 0

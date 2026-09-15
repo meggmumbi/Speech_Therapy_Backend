@@ -194,6 +194,56 @@ def optional_yod(phones: list[str]) -> list[str] | None:
     return out if changed else None
 
 
+def near_smoothing(phones: list[str]) -> list[list[str]]:
+    """Accept the smoothed realisations of the NEAR diphthong /I@/.
+
+    ``scripts/fetch_beep.py`` maps BEEP's ``ia`` to ``IH AH`` (non-rhotic) and
+    ``IH R`` (rhotic), because ARPAbet has no centring diphthong. Neither form
+    is what the acoustic model reports for a word-final NEAR: it is routinely
+    smoothed towards [i:] in Kenyan and southern British English, and the model
+    hears the first element as IY, not IH.
+
+    Measured on the study recordings: "onomatopoeia" expected
+    ``... P IH AH`` and produced ``... P IY``; "pneumonia" expected
+    ``N ... N IH AH`` and produced ``N ... N IY``. Both were correct and both
+    were flagged, with the IH->IY substitution as the named error.
+
+    Emitted as extra variants rather than as a fold, because the KIT/FLEECE
+    contrast is real everywhere else in the language and must stay scoreable;
+    it is only before a schwa that the two collapse.
+    """
+    out: list[list[str]] = []
+    for i in range(len(phones) - 1):
+        if strip_stress(phones[i]) != "IH" or strip_stress(phones[i + 1]) != "AH":
+            continue
+        tensed = list(phones)
+        tensed[i] = "IY"
+        out.append(tensed)
+        if i + 2 == len(phones):
+            # Fully smoothed: the schwa is absorbed altogether ("-pee", not
+            # "-pee-uh"), which is what both study recordings actually were.
+            out.append(phones[:i] + ["IY"])
+    return out
+
+
+def happy_tensing(phones: list[str]) -> list[str] | None:
+    """Accept either quality for the word-final unstressed happY vowel.
+
+    Whether the vowel of "happy", "very", "hyperbole" is [I] or [i] is the
+    classic happY-tensing variable (Wells 1982): it varies by region, by
+    speaker and by how carefully the word is said, and it is never contrastive
+    -- no English pair is distinguished by it. BEEP fixes it as ``iy``, so a
+    speaker producing the laxer variant was marked wrong.
+
+    Measured: "hyperbole" produced ``... B L IH`` against ``... B AH L IY``
+    and "ingenuity" ``... T IH`` against ``... T IY``, both flagged.
+    """
+    if not phones or strip_stress(phones[-1]) not in ("IY", "IH"):
+        return None
+    swapped = "IH" if strip_stress(phones[-1]) == "IY" else "IY"
+    return phones[:-1] + [swapped]
+
+
 def realisation_variants(form: tuple[str, ...]) -> list[tuple[str, ...]]:
     """Accepted ways one reference form can legitimately surface.
 
@@ -204,17 +254,28 @@ def realisation_variants(form: tuple[str, ...]) -> list[tuple[str, ...]]:
     out: list[tuple[str, ...]] = []
     base = list(form)
 
-    for variant in non_rhotic_nurse(base):
-        out.append(tuple(variant))
-    dropped = optional_yod(base)
-    if dropped:
-        out.append(tuple(dropped))
-        # Both adjustments at once: "turquoise" style words can need either.
-        for variant in non_rhotic_nurse(dropped):
-            out.append(tuple(variant))
-    trimmed = optional_final_stop(base)
-    if trimmed:
-        out.append(tuple(trimmed))
+    # Each rule is applied to what the rules before it produced, so a word
+    # needing two of them at once ("hyperbole": non-rhotic NURSE *and* happY
+    # tensing) is still covered. Kept to a fixed order so the variant list is
+    # deterministic and the same reference is reproducible run to run.
+    forms: list[list[str]] = [base]
+
+    for rule in (non_rhotic_nurse, near_smoothing):
+        for candidate in list(forms):
+            forms.extend(rule(candidate))
+
+    for rule in (optional_yod, happy_tensing, optional_final_stop):
+        for candidate in list(forms):
+            produced = rule(candidate)
+            if produced:
+                forms.append(produced)
+
+    seen = {tuple(base)}
+    for candidate in forms:
+        key = tuple(candidate)
+        if key not in seen:
+            seen.add(key)
+            out.append(key)
     return out
 
 

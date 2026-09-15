@@ -245,6 +245,30 @@ def contrast_cue(expected: str, actual: str | None) -> str | None:
     return cues[0] if has_it else cues[1]
 
 
+def _is_coachable(expected: str) -> bool:
+    """False for a reduced vowel, which cannot be honestly cued.
+
+    ARPAbet spells STRUT and schwa with the same symbol, AH: "cup" is AH1 and
+    the second vowel of "sofa" is AH0. The exemplars and articulatory cue
+    attached to AH are the STRUT ones -- "the u sound, as in cup", "relax
+    everything". Spoken over a schwa that is meant to be reduced, that cue
+    asks for a full stressed vowel in a position that should not have one,
+    which makes the production worse rather than better.
+
+    Stress digits would separate the two, but BEEP-derived references carry
+    none, so for most words we genuinely cannot tell which AH we are looking
+    at. Where a digit is present we trust it; where it is absent we decline to
+    name the phone and fall back to the whole-word prompt.
+
+    Measured on the study recordings: AH was the named phone in 5 of 76
+    wrongly-scored attempts (7%), so Condition D still delivers a specific cue
+    on the large majority of turns. The one it loses was misleading.
+    """
+    if strip_stress(expected) != "AH":
+        return True
+    return expected[-1:] in ("1", "2")
+
+
 def primary_diagnosis(result: AttemptScore) -> PhoneDiagnosis | None:
     """The one error worth mentioning: the worst-scoring nameable phone.
 
@@ -261,6 +285,7 @@ def primary_diagnosis(result: AttemptScore) -> PhoneDiagnosis | None:
         if d.kind in ("substitution", "weak", "deletion")
         and strip_stress(d.expected) in PHONE_EXEMPLARS
         and d.score < NAMEABLE_SCORE_CEILING
+        and _is_coachable(d.expected)
     ]
     if not nameable:
         return None

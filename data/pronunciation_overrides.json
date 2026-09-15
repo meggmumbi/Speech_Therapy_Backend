@@ -12,6 +12,13 @@
     "whoever decides what the study teaches."
   ],
 
+  "_why_niche": "BEEP gives only 'N IH CH' (the anglicised 'nitch'). British and Kenyan English overwhelmingly use the French-derived /ni:S/ 'neesh', which is what the study recordings contain. Scoring against 'nitch' marked correct speech wrong AND made the robot name CH as the sound to fix - telling the participant to correct the one thing they had right. Both forms are accepted; 'neesh' is listed first as the taught form.",
+  "niche": ["N IY SH", "N IH CH"],
+
+  "_why_colonel": "BEEP is right (/k3:n@l/, 'KER-nl') and needs no override; this note records that the ITEM PROMPT is wrong. It teaches 'Listen CO-LO-NEL. Now you try saying CO-LO-NEL', a three-syllable spelling pronunciation that is not the word. A participant who follows the robot will be marked wrong by a correctly-working scorer. Fix the prompt, not the reference.",
+
+  "_why_worcestershire": "Left to the lexicon deliberately. The prompt teaches 'WUSS-ter-sher', which the CMU_ADAPTED entry already covers via its SH AH variant.",
+
   "_why_tuktuk": "Kenyan English, absent from BEEP and CMUdict. g2p predicted 'T AH1 T K AH0' (roughly 'tutka'), which failed both study attempts on a reference error rather than a pronunciation error.",
   "tuktuk": ["T UH K T UH K", "T AH K T AH K"],
 
