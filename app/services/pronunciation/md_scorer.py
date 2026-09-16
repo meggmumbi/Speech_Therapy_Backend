@@ -89,8 +89,12 @@ def load_md_layer(path: Path = MODEL_PATH) -> MDLayer | None:
     _attempted = True
 
     if not path.exists():
-        log.info("no MD layer at %s; scoring with GOP only "
-                 "(train one with scripts/train_md_layer.py)", path)
+        # A warning, not info: without this file every verdict threshold in
+        # config.py is on the wrong scale, and on 2026-09-15 a fresh checkout
+        # ran a whole morning of pilot tests that way without anyone noticing.
+        log.warning("no MD layer at %s; scoring with GOP only, and the fitted "
+                    "verdict thresholds do NOT apply to GOP scores. Train one "
+                    "with scripts/train_md_layer.py", path)
         return None
     try:
         import joblib
@@ -113,6 +117,11 @@ def load_md_layer(path: Path = MODEL_PATH) -> MDLayer | None:
         log.exception("could not load the MD layer; falling back to GOP")
         _layer = None
     return _layer
+
+
+def md_layer_active() -> bool:
+    """Is a fitted layer loaded (loading it if this is the first ask)?"""
+    return load_md_layer() is not None
 
 
 def reset() -> None:

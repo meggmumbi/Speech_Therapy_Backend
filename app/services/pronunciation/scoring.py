@@ -26,10 +26,11 @@ estimate.
 
 from __future__ import annotations
 
+import logging
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Iterator, Literal, Sequence
+from typing import Callable, Iterator, Literal, Sequence
 
 import numpy as np
 
@@ -47,6 +48,8 @@ from .md_features import word_positions
 from .md_scorer import load_md_layer
 from .references import Reference, ReferenceSource, reference_for
 from .prosody import StressAnalysis, analyse_stress
+
+log = logging.getLogger(__name__)
 
 Verdict = Literal["correct", "close", "stress_error", "incorrect", "gated", "unscorable"]
 
@@ -309,11 +312,14 @@ def _classify(
     """
     t = config.thresholds
     segmental_errors = _corroborated_errors(diagnoses, t.phone_error)
+    # Whether the stress detector is trusted enough to fail an attempt on its
+    # own -- see PipelineConfig.stress_can_fail_verdict for why it is not yet.
+    stress_counts = config.stress_can_fail_verdict
 
     if score >= t.correct and not segmental_errors:
-        # Correct segmentally; a stress error still makes the word wrong, and
-        # is the one the learner most needs told.
-        if stress is not None and stress.is_error:
+        # Correct segmentally. A stress error would still make the word wrong,
+        # but only if the detector can be trusted to have found one.
+        if stress_counts and stress is not None and stress.is_error:
             return "stress_error"
         return "correct"
 
@@ -327,15 +333,23 @@ def _classify(
             and supported >= config.transcript_rescue_min_phone_fraction):
         # The recogniser heard the target word and the audio supports most of
         # its phones: do not call this wrong.
-        if stress is not None and stress.is_error:
+        if stress_counts and stress is not None and stress.is_error:
             return "stress_error"
         return "correct"
 
-    if stress is not None and stress.is_error and not segmental_errors:
+    if (stress_counts and stress is not None and stress.is_error
+            and not segmental_errors):
         return "stress_error"
     if score >= t.close:
         return "close"
     return "incorrect"
+
+
+# Called with the *trimmed* waveform and its sample rate, so the recogniser
+# sees the same audio the scorer did. Leading and trailing silence measurably
+# hurt Whisper on single words: the same clip that read "Onamat appear"
+# untrimmed read "Onomatopoeia" trimmed.
+TranscriptProvider = Callable[[np.ndarray, int], "str | None"]
 
 
 def score_attempt(
@@ -345,6 +359,7 @@ def score_attempt(
     model: AcousticModel,
     config: PipelineConfig = DEFAULT_CONFIG,
     transcript: str | None = None,
+    transcript_provider: TranscriptProvider | None = None,
 ) -> AttemptScore:
     """Score one spoken attempt at ``word``.
 
@@ -355,6 +370,12 @@ def score_attempt(
     ``transcript`` is the client's ASR output, when available. It is used only
     as a guard against false negatives -- never to lower a score. See
     :func:`_classify`.
+
+    ``transcript_provider`` is a fallback for when the client sent none: a
+    callable that produces a transcript on demand (server-side ASR). It is
+    invoked only if the acoustic verdict comes out as not correct, so a correct
+    attempt never pays its latency, and the graded score is unaffected either
+    way.
     """
     timings = Timings()
     target = normalize_text(word)
@@ -370,7 +391,8 @@ def score_attempt(
 
     return score_phone_sequence(target, reference.variants, waveform,
                                 sample_rate, model, config, timings,
-                                reference=reference, transcript=transcript)
+                                reference=reference, transcript=transcript,
+                                transcript_provider=transcript_provider)
 
 
 def score_phone_sequence(
@@ -383,6 +405,7 @@ def score_phone_sequence(
     timings: Timings | None = None,
     reference: Reference | None = None,
     transcript: str | None = None,
+    transcript_provider: TranscriptProvider | None = None,
 ) -> AttemptScore:
     """Score audio against an explicit set of accepted phone sequences.
 
@@ -501,6 +524,23 @@ def score_phone_sequence(
         verdict = _classify(verdict_score, diagnoses, stress, config,
                             transcript_match=heard_target,
                             phone_scores=phone_scores)
+
+    if (verdict != "correct" and transcript is None
+            and transcript_provider is not None):
+        # The acoustics say wrong and no client transcript exists to check
+        # that against: now, and only now, ask the server-side recogniser.
+        # Its answer can rescue the verdict but never worsen it.
+        with timings.stage("asr"):
+            try:
+                transcript = transcript_provider(waveform, sample_rate)
+            except Exception:  # noqa: BLE001 - ASR failure must not fail scoring
+                log.exception("server-side ASR failed; verdict stands")
+                transcript = None
+        if transcript is not None:
+            heard_target = transcript_matches_target(transcript, target, reference)
+            verdict = _classify(verdict_score, diagnoses, stress, config,
+                                transcript_match=heard_target,
+                                phone_scores=phone_scores)
 
     return AttemptScore(
         word=target,

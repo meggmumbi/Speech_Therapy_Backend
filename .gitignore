@@ -24,6 +24,11 @@ dist/
 # Trained model artifacts (regenerated at runtime)
 *.pkl
 *.joblib
+# ...except the fitted MD layer. It is 0.5 MB, deterministic to retrain
+# (scripts/train_md_layer.py), and every verdict threshold assumes it is
+# present. A checkout without it silently scores with raw GOP -- which is what
+# happened to the 2026-09-15 pilot on a second machine.
+!data/md_layer.joblib
 
 # Test / tooling caches
 .pytest_cache/
@@ -45,3 +50,5 @@ Desktop.ini
 
 # Logs
 *.log
+
+study_audio/

@@ -25,6 +25,12 @@
   "_why_quinoa": "Absent from BEEP. g2p gave 'K W IH1 N OW0' (kwih-noh), but the robot's own prompt teaches 'keen-waa'. Scoring against a form the participant was never taught is not a pronunciation test.",
   "quinoa": ["K IY N W AA", "K W IY N OW AH", "K IH N W AA"],
 
+  "_why_comparable": "Two standard stress patterns exist: the traditional COM-parable (BEEP: K AA M P AH R AH B L) and the now-common com-PAR-able (/k@m'par@bl/). BEEP lists only the first. Both are accepted; BEEP's form is listed first so the robot keeps modelling the traditional one. Note the 2026-09-15 pilot attempts at this word were heard as 'comfortable' (K AH M F ER T AH B AH L) - a different word, correctly failed - so this entry fixes the reference, not those attempts.",
+  "comparable": ["K AA M P AH R AH B L", "K AH M P AE R AH B L", "K AH M P EH R AH B L"],
+
+  "_why_rendezvous": "BEEP and CMUdict both give only the reduced second vowel (R AA/AO N D IH V UW, 'ron-di-voo'). The Longman Pronunciation Dictionary's British form is /'rOndeIvu:/ with a full DEY, which is what both 2026-09-15 pilot attempts contained (heard R AO N D EY V UW) and were failed for. Both are accepted; the DEY form is listed first as the taught form. Final Z (plural/verb) stays as an accepted variant.",
+  "rendezvous": ["R AO N D EY V UW", "R AA N D EY V UW", "R AO N D IH V UW", "R AA N D IH V UW", "R AO N D EY V UW Z"],
+
   "_why_bodaboda": "Kenyan English for a motorbike taxi; used in the Vehicles prompts.",
   "bodaboda": ["B OW D AH B OW D AH"],
   "matatu": ["M AH T AA T UW"],

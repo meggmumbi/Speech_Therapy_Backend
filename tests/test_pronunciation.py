@@ -802,3 +802,151 @@ if __name__ == "__main__":
             print(f"  FAIL {name}: {type(exc).__name__}: {exc}")
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)
+
+
+# --- 2026-09-15 pilot: reference realisations ------------------------------
+
+def test_nurse_vowel_accepts_the_fronted_realisation():
+    """"colonel" was heard K EH N L in all four pilot attempts by two speakers.
+    A fronted [3:] is the usual Kenyan realisation; EH is the model's nearest
+    label for it."""
+    from app.services.pronunciation.references import reference_for
+    forms = {tuple(v) for v in reference_for("colonel").variants}
+    assert ("K", "EH", "N", "L") in forms
+    assert ("K", "ER", "N", "L") in forms          # the dictionary form stays
+
+
+def test_syllabic_schwa_is_optional_in_both_directions():
+    from app.services.pronunciation.references import optional_syllabic_schwa
+    # dictionary has the syllabic consonant; speaker inserts a schwa
+    assert ["S", "AH", "T", "AH", "L"] in optional_syllabic_schwa(["S", "AH", "T", "L"])
+    # dictionary has the schwa; speaker elides it
+    assert ["K", "AE", "Z", "M"] in optional_syllabic_schwa(["K", "AE", "Z", "AH", "M"])
+    # a full vowel before a final nasal is not a schwa and is left alone
+    assert optional_syllabic_schwa(["W", "IH", "M", "IH", "N"]) == []
+    # a vowel-final word has nothing to do
+    assert optional_syllabic_schwa(["B", "IH", "Z", "IY"]) == []
+
+
+def test_final_cluster_reductions_are_accepted():
+    from app.services.pronunciation.references import reference_for
+    months = {tuple(v) for v in reference_for("months").variants}
+    assert ("M", "AH", "N", "S") in months and ("M", "AH", "N", "T", "S") in months
+    assert ("M", "AH", "N", "TH", "S") in months
+    clothes = {tuple(v) for v in reference_for("clothes").variants}
+    assert ("K", "L", "OW", "Z") in clothes and ("K", "L", "OW", "DH", "Z") in clothes
+
+
+def test_final_l_vocalisation_is_accepted():
+    from app.services.pronunciation.references import final_l_vocalisation
+    assert final_l_vocalisation(["S", "AH", "T", "L"]) == ["S", "AH", "T", "OW"]
+    assert final_l_vocalisation(["R", "UH", "R", "AH", "L"]) == ["R", "UH", "R", "OW"]
+    # a full vowel + L ("feel") is not the syllabic dark-l case
+    assert final_l_vocalisation(["F", "IY", "L"]) is None
+
+
+def test_override_forms_still_get_realisation_variants():
+    """The override fixes WHICH pronunciation; how the model hears it is a
+    separate fact and applies regardless of the lexicon layer."""
+    from app.services.pronunciation.references import reference_for
+    ref = reference_for("comparable")
+    assert ref.source.value == "override"
+    forms = {tuple(v) for v in ref.variants}
+    assert ("K", "AA", "M", "P", "AH", "R", "AH", "B", "AH", "L") in forms
+
+
+def test_variant_count_stays_bounded():
+    from app.services.pronunciation.references import MAX_VARIANTS, reference_for
+    for word in ("colonel", "onomatopoeia", "hyperbole", "rural", "preferable"):
+        assert len(reference_for(word).variants) <= MAX_VARIANTS, word
+
+
+# --- 2026-09-15 pilot: stress cannot fail an attempt on its own -------------
+
+def test_stress_error_alone_does_not_fail_a_correct_attempt():
+    """"receipt" scored 0.904 segmentally and was failed on stress by a
+    detector that picked the first vowel 88% of the time. Until it is
+    validated, stress is reported but cannot be the reason for "wrong"."""
+    from app.services.pronunciation.prosody import StressAnalysis
+    from app.services.pronunciation.scoring import _classify
+    stress = StressAnalysis((), realised_primary=0, expected_primary=1,
+                            is_error=True, margin=0.5)
+    config = PipelineConfig(backend="stub")
+    assert config.stress_can_fail_verdict is False
+    assert _classify(0.9, [], stress, config) == "correct"
+    strict = PipelineConfig(backend="stub", stress_can_fail_verdict=True)
+    assert _classify(0.9, [], stress, strict) == "stress_error"
+
+
+def test_declination_correction_stops_first_vowel_bias():
+    """A word whose second vowel is longer but quieter -- because amplitude
+    falls through the utterance -- must not have its first vowel called
+    stressed on loudness alone."""
+    from app.services.pronunciation.align import FrameSpan
+    from app.services.pronunciation.prosody import analyse_stress
+    sr, stride = SR, 0.02
+    # 40 frames = 0.8 s; amplitude decays exponentially across the utterance.
+    n = int(0.8 * sr)
+    t = np.arange(n) / sr
+    env = np.exp(-2.5 * t)                       # quieter towards the end
+    wav = (0.3 * env * np.sin(2 * np.pi * 150 * t)).astype(np.float32)
+    # R [0,5)  IH [5,11)  S [11,17)  IY [17,34)  T [34,40): second vowel 3x longer
+    phones = ["R", "IH0", "S", "IY1", "T"]
+    bounds = [(0, 5), (5, 11), (11, 17), (17, 34), (34, 40)]
+    spans = [FrameSpan(i, p, a, b)
+             for i, (p, (a, b)) in enumerate(zip(phones, bounds))]
+    result = analyse_stress(wav, sr, spans, phones, stride)
+    assert result.expected_primary == 1
+    assert result.realised_primary == 1, result
+    assert result.is_error is False
+
+
+# --- 2026-09-15 pilot: server-side transcript provider ----------------------
+
+def test_transcript_provider_is_only_consulted_when_needed():
+    """Lazy by design: a correct attempt never pays the ASR latency, and a
+    failing one is rescued by a matching server-side transcript."""
+    from app.services.pronunciation import score_attempt
+    calls = []
+
+    def provider(waveform, sample_rate):
+        calls.append(1)
+        assert sample_rate == SR and len(waveform) > 0
+        return "draught"
+
+    config = PipelineConfig(backend="stub", use_md_layer=False)
+    good = StubAcousticModel(produced=["D", "R", "AA", "F", "T"],
+                             frames_per_phone=5, confidence=0.95)
+    r = score_attempt("draught", _waveform(0.5), SR, good, config,
+                      transcript_provider=provider)
+    assert r.is_correct and calls == [] and r.transcript is None
+
+    bad = StubAcousticModel(produced=["D", "R", "AE", "F", "T"],
+                            frames_per_phone=5, confidence=0.95)
+    r = score_attempt("draught", _waveform(0.5), SR, bad, config,
+                      transcript_provider=provider)
+    assert calls == [1]
+    assert r.transcript == "draught" and r.transcript_matches is True
+    assert r.is_correct
+    assert "asr" in r.timings.stages
+
+
+def test_transcript_provider_failure_leaves_the_verdict_standing():
+    from app.services.pronunciation import score_attempt
+
+    def broken(waveform, sample_rate):
+        raise RuntimeError("model not downloaded")
+
+    config = PipelineConfig(backend="stub", use_md_layer=False)
+    bad = StubAcousticModel(produced=["Z", "Z", "Z"], frames_per_phone=5,
+                            confidence=0.95)
+    r = score_attempt("draught", _waveform(0.4), SR, bad, config,
+                      transcript_provider=broken)
+    assert r.verdict != "correct" and r.transcript is None
+
+
+def test_provenance_reports_whether_the_md_layer_is_active():
+    from app.services.pronunciation.md_scorer import md_layer_active
+    prov = PipelineConfig(backend="stub").provenance()
+    assert prov["md_layer"] == ("active" if md_layer_active() else "inactive")
+    assert PipelineConfig(backend="stub", use_md_layer=False).provenance()["md_layer"] == "inactive"

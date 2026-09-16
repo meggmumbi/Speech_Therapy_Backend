@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import ActivityItem, SessionActivity, TherapySession
-from ..services.pronunciation import score_attempt
+from ..services.pronunciation import asr, score_attempt
 from ..services.pronunciation.audio import to_mono_float32
 from ..services.pronunciation.feedback import generate_feedback
 from ..services.pronunciation.runtime import get_config, get_model, is_ready
@@ -217,8 +217,13 @@ async def score_pronunciation_attempt(
     scored_before = sum(1 for a in prior if not a.gated)
 
     config = get_config()
-    result = score_attempt(str(item.name), waveform, sample_rate,
-                           get_model(), config, transcript=transcript)
+    result = score_attempt(
+        str(item.name), waveform, sample_rate, get_model(), config,
+        transcript=transcript,
+        # Server-side recognition, invoked only if the acoustics say wrong and
+        # the client sent nothing to check that against. See services/asr.py.
+        transcript_provider=asr.provider_for(config.server_asr),
+    )
 
     gated = result.verdict in ("gated", "unscorable")
     # Whether another attempt at this item follows. The client must not decide
@@ -352,8 +357,11 @@ async def analyze_audio(
 
     waveform, sample_rate = _decode_wav(raw)
     config = get_config()
-    result = score_attempt(word, waveform, sample_rate, get_model(), config,
-                           transcript=transcript)
+    result = score_attempt(
+        word, waveform, sample_rate, get_model(), config,
+        transcript=transcript,
+        transcript_provider=asr.provider_for(config.server_asr),
+    )
 
     # Both conditions, so the wording of each can be compared side by side.
     feedback = {
@@ -409,6 +417,12 @@ def pronunciation_health():
     """Whether scoring is available, and under exactly which configuration."""
     config = get_config()
     payload = {"ready": is_ready(), **config.provenance()}
+    # Both safety nets, stated explicitly. Either one silently absent is how
+    # the 2026-09-15 pilot ran a morning of tests on a degraded scorer.
+    payload["server_asr"] = (
+        f"faster-whisper {config.server_asr}"
+        if asr.is_available(config.server_asr) else "inactive"
+    )
     if is_ready():
         info = get_model().describe()
         payload.update(

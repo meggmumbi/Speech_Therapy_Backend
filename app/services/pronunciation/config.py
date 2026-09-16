@@ -237,6 +237,45 @@ class PipelineConfig:
     # before 2026-09-12 was computed with.
     use_md_layer: bool = True
 
+    # May a stress judgement alone make an attempt "wrong"?
+    #
+    # No, until prosody.analyse_stress is validated against human stress
+    # judgements. Measured on 50 study attempts (2026-09-15) it called the
+    # FIRST vowel the stressed one in 88% of them, because raw RMS falls
+    # through an utterance (last vowel quieter than first in 94% of attempts,
+    # median ratio 0.40) and that swamped duration. Declination correction
+    # brought it to 70%, against 33% for duration alone -- better, still not a
+    # stress detector. Without F0, which is the primary correlate of English
+    # lexical stress and is deliberately not extracted in the real-time path,
+    # this cannot be fixed properly.
+    #
+    # The cost of leaving it on was concrete: "receipt" was marked wrong on
+    # stress while scoring 0.904 segmentally, and every non-initially-stressed
+    # word -- receipt, debut, debris, hyperbole -- was exposed to the same
+    # failure. Those are precisely the advanced words the study needs.
+    #
+    # Stress is still computed, still stored on every attempt, and still
+    # available to feedback; it simply cannot be the sole reason a participant
+    # is told they got a word wrong. Turn this back on once the detector has
+    # been validated on the rater-adjudicated sample.
+    stress_can_fail_verdict: bool = False
+
+    # Server-side ASR used ONLY as the false-rejection safety net, and only
+    # when the client sent no transcript of its own. A faster-whisper model
+    # name ("tiny.en", "base.en", "small.en"); None disables it.
+    #
+    # Why it exists: the transcript rescue in scoring._classify was designed
+    # around the tablet's on-device recogniser, but the recording path that
+    # ships (PcmAudioRecorder) never runs that recogniser -- both want the
+    # microphone -- so `transcript` arrived NULL on every one of the 78 pilot
+    # attempts of 2026-09-15 and the safety net had never once fired. Running
+    # ASR on the WAV the server already holds needs no change to the robot.
+    #
+    # It runs lazily: only after the acoustic verdict has come out as not
+    # correct. A correct attempt never pays for it, and the graded score for
+    # H2 is untouched by it either way.
+    server_asr: str | None = "base.en"
+
     quality_aggregation: str = "mean"
     verdict_aggregation: str = "worst_k"
     verdict_worst_k: int = 2
@@ -271,6 +310,7 @@ class PipelineConfig:
     def provenance(self) -> dict[str, str | None]:
         """What to persist on every attempt for later reproduction."""
         from .features import FEATURE_SET_VERSION
+        from .md_scorer import md_layer_active
         return {
             "pipeline_version": PIPELINE_VERSION,
             "config_hash": self.config_hash(),
@@ -278,6 +318,14 @@ class PipelineConfig:
             "backend": self.backend,
             "feature_set": FEATURE_SET_VERSION,
             "calibrated_on": self.thresholds.calibrated_on,
+            # Whether the supervised layer was actually loaded, not merely
+            # requested. The two differ whenever data/md_layer.joblib is
+            # missing from a checkout -- which happened silently on
+            # 2026-09-15: every attempt that day was scored with raw GOP
+            # against thresholds fitted for the MD scale, and nothing in the
+            # stored rows said so.
+            "md_layer": "active" if (self.use_md_layer and md_layer_active())
+                        else "inactive",
         }
 
 
