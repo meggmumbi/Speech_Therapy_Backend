@@ -389,9 +389,17 @@ def _present(item: models.ActivityItem, seed: int | None) -> dict:
     reproducible from the session row.
     """
     exercise_type = item.effective_type
+    spec_body = dict(item.spec or {})
+
+    # `name` is derived from the spec, and for a choice item that means it *is*
+    # the answer. Sending it would put the key on the tablet through the back
+    # door, and the screen would render it as the item's title. The syllable
+    # types are safe: their answer is an index, not the word.
+    reveals_answer = not exercises.needs_asr(exercise_type) and "answer" in spec_body
+
     body: dict = {
         "id": str(item.id),
-        "name": item.name,
+        "name": "" if reveals_answer else item.name,
         "description": item.description,
         "image_url": item.image_url,
         "audio_url": item.audio_url,
@@ -402,16 +410,18 @@ def _present(item: models.ActivityItem, seed: int | None) -> dict:
         "presentation": {},
     }
 
-    spec = dict(item.spec or {})
-    spec.pop("answer", None)
-    spec.pop("answer_index", None)
-    spec.pop("answer_indices", None)
-    if "options" in spec:
-        options = list(spec["options"])
+    spec_body.pop("answer", None)
+    spec_body.pop("answer_index", None)
+    spec_body.pop("answer_indices", None)
+    if "options" in spec_body:
+        options = list(spec_body["options"])
         if seed is not None:
-            random.Random(seed ^ hash(str(item.id)) & 0x7FFFFFFF).shuffle(options)
-        spec["options"] = options
-    body["presentation"] = spec
+            # Per item, not per session: one shuffle for the whole session
+            # would put every key in the same slot, and a participant who
+            # noticed would be answering position rather than sound.
+            random.Random((seed ^ (hash(str(item.id)) & 0x7FFFFFFF))).shuffle(options)
+        spec_body["options"] = options
+    body["presentation"] = spec_body
     return body
 
 

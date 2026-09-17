@@ -207,6 +207,90 @@ def test_every_type_has_an_instruction():
         assert prompt and prompt.strip() == prompt
 
 
+# --- what reaches the tablet ------------------------------------------------
+#
+# Grading happens on the server so that the answer key never sits in memory on
+# a device a participant is holding. These check that the payload honours it.
+
+class _Item:
+    """Stand-in for an ActivityItem row."""
+
+    def __init__(self, exercise_type, spec, name):
+        import uuid as _uuid
+        self.id = _uuid.uuid4()
+        self.name = name
+        self.description = "Tap the word you heard."
+        self.image_url = None
+        self.audio_url = None
+        self.difficulty_level = "medium"
+        self.exercise_type = exercise_type
+        self.spec = spec
+        self.target_feature = "kit_fleece"
+
+    @property
+    def effective_type(self):
+        return self.exercise_type or "repeat_word"
+
+
+def _present(item, seed=1234):
+    from app.api.study import _present as present
+    return present(item, seed)
+
+
+def test_the_answer_key_is_stripped_from_every_tapped_type():
+    cases = [
+        ("minimal_pair_id", {"options": ["ship", "sheep"], "answer": "ship"}, "ship"),
+        ("odd_one_out", {"options": ["ship", "chip", "sheep"], "answer": "sheep"}, "sheep"),
+        ("stress_place", {"word": "banana", "syllables": ["ba", "na", "na"],
+                          "answer_index": 1}, "banana"),
+        ("schwa_spot", {"word": "banana", "syllables": ["ba", "na", "na"],
+                        "answer_indices": [0, 2]}, "banana"),
+    ]
+    for exercise_type, spec_body, name in cases:
+        body = _present(_Item(exercise_type, spec_body, name))
+        presentation = body["presentation"]
+        for key in ("answer", "answer_index", "answer_indices"):
+            assert key not in presentation, f"{exercise_type} leaked {key}"
+
+
+def test_a_choice_items_name_is_withheld_because_it_is_the_answer():
+    """display_name() derives the name from the spec, which for a choice item
+    means the name *is* the key. Sending it would put the answer on the tablet
+    through the back door and the screen would render it as the title."""
+    body = _present(_Item("minimal_pair_id",
+                          {"options": ["ship", "sheep"], "answer": "ship"}, "ship"))
+    assert body["name"] == ""
+    assert sorted(body["presentation"]["options"]) == ["sheep", "ship"]
+
+
+def test_a_syllable_items_name_is_safe_to_show():
+    """Its answer is an index, not the word, so the word is not a giveaway and
+    the participant needs to see it."""
+    body = _present(_Item("stress_place",
+                          {"word": "banana", "syllables": ["ba", "na", "na"],
+                           "answer_index": 1}, "banana"))
+    assert body["name"] == "banana"
+    assert body["presentation"]["syllables"] == ["ba", "na", "na"]
+
+
+def test_a_spoken_item_keeps_its_word():
+    body = _present(_Item("repeat_word", {"word": "ship"}, "ship"))
+    assert body["name"] == "ship"
+    assert body["needs_speech"] is True
+
+
+def test_options_do_not_sit_in_the_same_slot_for_every_item():
+    """One shuffle for the whole session would put every key in the same
+    position, and a participant who noticed would be answering position rather
+    than sound."""
+    layouts = set()
+    for _ in range(20):
+        body = _present(_Item("minimal_pair_id",
+                              {"options": ["ship", "sheep"], "answer": "ship"}, "ship"))
+        layouts.add(tuple(body["presentation"]["options"]))
+    assert len(layouts) == 2, "option order never varies between items"
+
+
 # --- target features --------------------------------------------------------
 
 def test_features_are_the_kenyan_transfer_set():
