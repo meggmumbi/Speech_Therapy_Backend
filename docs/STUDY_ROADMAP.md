@@ -274,7 +274,7 @@ should be done once, for both.
 
 ---
 
-## Phase 5 — measurement instruments
+## Phase 5 — measurement instruments (DONE, 2026-09-17)
 
 - **In-app questionnaire keyed to `session_id`.** Currently the Google Form
   joins to sessions only by a hand-typed code like "P2" while the database uses
@@ -290,6 +290,46 @@ should be done once, for both.
 - **Per-event feedback quality rating**, not one score per session. The
   session-level version (16/20 "accurate and specific") is the most useful item
   in the pilot data and deserves to be measured properly.
+
+**Landed:** a 19-item instrument in `app/services/instruments.py` -- abbreviated
+Godspeed, three IMI subscales, and a feedback-trust scale -- served and stored
+against `session_id`, plus a per-attempt helpfulness rating and a researcher
+session note. 13 tests in `tests/test_instruments.py`, 187 passing overall.
+
+**Where the questionnaire sits, and why it matters.** Between the session and
+its summary, never after it. A participant who has just been shown "75%
+accuracy" is no longer rating the tutor, they are rating their own result, and
+the correlation between accuracy and "the tutor was helpful" would then be a
+property of the screen order rather than of the feedback. The route pops itself
+off the back stack so Back cannot walk into it after the score has been seen.
+
+**Who is asked.** Training blocks only. There is no tutor behaviour in a
+pre-test to form an impression of, so asking would collect ratings of something
+that did not happen, and asking at all would frame the test as a performance
+worth reflecting on. The endpoint refuses a submission for an assessment rather
+than relying on the app to not offer one.
+
+**What replaced the old session feedback.** The star rating and three boxes of
+clinical prose are gone. They asked an unblinded researcher for their view of
+the participant's "progress and achievements" immediately after watching them,
+which is not a measure of anything here -- the recordings are -- and which puts
+an impression next to the data. In its place is a set of checkboxes for the
+things that would make a session unusable: interrupted, noisy, equipment
+problem, participant unwell, instructions explained in another language, plus a
+recommend-exclude flag and one free-text line. Quick enough to actually fill in
+between participants, which the four-box version was not.
+
+**Three anti-ceiling decisions:**
+
+- Seven points, not five. A five-point scale with a virtuous end is what
+  produced the pilot's ceiling.
+- Named poles ("Unkind ... Kind") rather than agree/disagree about a virtuous
+  statement, which has one obviously nice end.
+- Reverse-scored items, and the reversal flag is never sent to the tablet. A
+  respondent who knows which items are flipped can stay consistent on purpose,
+  which is exactly what reversals exist to detect. Straight-lining now shows up
+  as an inconsistent total rather than a perfect one, and the time taken is
+  stored alongside.
 
 ---
 

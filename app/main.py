@@ -6,7 +6,8 @@ from .api import (
     activities,
     speech_processing,
     analytics,
-    feedback, ws_routes, genericappendpoints, pronunciation, study, authoring
+    feedback, ws_routes, genericappendpoints, pronunciation, study, authoring,
+    questionnaire,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
@@ -45,3 +46,4 @@ app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])  # Ad
 app.include_router(pronunciation.router, prefix="/pronunciation", tags=["pronunciation"])
 app.include_router(study.router, prefix="/study", tags=["study"])
 app.include_router(authoring.router, prefix="/authoring", tags=["authoring"])
+app.include_router(questionnaire.router, prefix="/measures", tags=["questionnaire"])

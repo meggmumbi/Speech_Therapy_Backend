@@ -373,12 +373,16 @@ def session_items(session_id: uuid.UUID, db: Session = Depends(get_db)):
         "condition": session.condition,
         "gives_feedback": not study_design.is_assessment(session.session_type),
         "item_order_seed": session.item_order_seed,
-        "items": [_present(by_id[item_id], session.item_order_seed)
-                  for item_id in ordered_ids],
+        "items": [
+            _present(by_id[item_id], session.item_order_seed,
+                     teaching=not study_design.is_assessment(session.session_type))
+            for item_id in ordered_ids
+        ],
     }
 
 
-def _present(item: models.ActivityItem, seed: int | None) -> dict:
+def _present(item: models.ActivityItem, seed: int | None,
+             teaching: bool = True) -> dict:
     """One item as the tablet should see it.
 
     The answer key is removed. For a tap-answer item the options go to the
@@ -405,10 +409,25 @@ def _present(item: models.ActivityItem, seed: int | None) -> dict:
         "audio_url": item.audio_url,
         "difficulty_level": item.difficulty_level,
         "exercise_type": exercise_type,
-        "target_feature": item.target_feature,
+        # Named on screen only where naming it is allowed; see below.
+        "target_feature": item.target_feature if teaching else None,
+        "target_feature_label": (
+            exercises.FEATURES_BY_KEY[item.target_feature].label
+            if teaching and item.target_feature in exercises.FEATURES_BY_KEY else None
+        ),
         "needs_speech": exercises.needs_asr(exercise_type),
         "presentation": {},
     }
+
+    # Which letters to tint, for the tablet. Offered in training blocks and
+    # withheld from assessments: pointing at the vowel that matters is
+    # instruction, and an assessment measures what the participant brings to it
+    # rather than what the screen just told them.
+    if teaching:
+        word = spec_body.get("word") or spec_body.get("target_word") or ""
+        span = exercises.highlight_span(word, item.target_feature)
+        if span:
+            body["highlight"] = {"text": word, "start": span[0], "end": span[1]}
 
     spec_body.pop("answer", None)
     spec_body.pop("answer_index", None)

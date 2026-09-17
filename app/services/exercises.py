@@ -175,6 +175,42 @@ FEATURES_BY_KEY: dict[str, TargetFeature] = {f.key: f for f in FEATURES}
 TARGET_FEATURES: tuple[str, ...] = tuple(f.key for f in FEATURES)
 
 
+#: Which letters of a word carry the feature being taught, so the tablet can
+#: tint them. Ordered: the first spelling found in the word wins.
+#:
+#: Rough by design. English spelling does not map onto sounds cleanly and this
+#: is not a grapheme-to-phoneme model; it is a visual cue pointing at roughly
+#: the right part of the word. Where it would be wrong more often than right --
+#: schwa, which can be almost any vowel letter, and stress, which is a property
+#: of a syllable rather than a letter -- there is no entry and nothing is
+#: tinted.
+HIGHLIGHT_GRAPHEMES: dict[str, tuple[str, ...]] = {
+    "kit_fleece": ("ee", "ea", "i"),
+    "foot_goose": ("oo", "ou", "u"),
+    "trap_palm_strut": ("ar", "a", "u"),
+    "dental_fricative": ("th",),
+    "rhotic_lateral": ("r", "l"),
+}
+
+
+def highlight_span(word: str, feature: str | None) -> tuple[int, int] | None:
+    """Where in [word] to draw attention, as (start, end), or None.
+
+    Only ever a teaching aid, so it is offered in training blocks and withheld
+    from assessments: pointing at the vowel that matters is instruction, and an
+    assessment is supposed to measure what the participant brings to it rather
+    than what the screen just told them.
+    """
+    if not feature or not word:
+        return None
+    lowered = word.lower()
+    for grapheme in HIGHLIGHT_GRAPHEMES.get(feature, ()):
+        index = lowered.find(grapheme)
+        if index != -1:
+            return index, index + len(grapheme)
+    return None
+
+
 # --- study roles for a category ---------------------------------------------
 #
 # Which category is training list A, which is list B, and which holds the

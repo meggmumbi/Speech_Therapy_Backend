@@ -58,6 +58,17 @@ class SessionActivity(Base):
     # "yay" unprompted as what gave them confidence, and a per-session count of
     # instructed celebrations is the granularity that claim can be tested at.
     celebration_shown = Column(Boolean)
+
+    # --- Phase 5: was that correction any good? -----------------------------
+    # 1..5, NULL when not asked. Sampled rather than asked after every
+    # correction: a tap on every item would turn the session into a survey, and
+    # the later answers would be worse than none.
+    #
+    # The pilot asked this once per session, which was its most useful item and
+    # measured at the wrong grain: one number cannot distinguish a session with
+    # one bad correction from one with six, and that is exactly the contrast
+    # between K and D that needs item-level variance to detect.
+    feedback_helpful = Column(Integer)
     feedback = Column(String)
     pronunciation_score = Column(Float)
     response_time_seconds = Column(Float)
