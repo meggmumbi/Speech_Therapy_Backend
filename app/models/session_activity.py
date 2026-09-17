@@ -50,6 +50,32 @@ class SessionActivity(Base):
     reference_needs_review = Column(Boolean)   # target was a g2p prediction
     transcript = Column(String)                # client ASR output, if sent
     transcript_matches = Column(Boolean)       # did it agree the target was said
+    # --- device-side timing ------------------------------------------------
+    # The response-time DV is the interval from the end of the robot's prompt
+    # to the start of the participant's speech. Both instants happen on the
+    # tablet, so both are timed there; a server timestamp would measure upload
+    # latency as well and would vary with the wifi in the room.
+    #
+    # Stored as the raw instants rather than only the difference, so that a
+    # suspicious value can be diagnosed afterwards (a long gap because the
+    # participant hesitated looks identical to one because the recorder started
+    # late, unless you kept both ends).
+    prompt_ended_at = Column(DateTime)
+    speech_started_at = Column(DateTime)
+    speech_ended_at = Column(DateTime)
+
+    # --- recording quality --------------------------------------------------
+    # Measured on the uploaded audio, before scoring. This is about the
+    # recording, not the recognition: `confidence` already says how sure the
+    # acoustic model was, but it cannot distinguish "said it oddly" from
+    # "microphone was three metres away". The 2026-09-15 batch contained a
+    # two-second clip of clucking and one of a bystander's conversation, and
+    # nothing in the stored row said so.
+    audio_peak = Column(Float)             # 0..1, absolute peak sample
+    audio_rms_dbfs = Column(Float)         # loudness of the speech portion
+    audio_clipped_fraction = Column(Float) # fraction of samples at full scale
+    audio_quality = Column(String(12))     # ok/quiet/clipped/short/long/silent
+
     # --- reproducibility ---------------------------------------------------
     audio_ref = Column(String)             # path to the retained recording
     pipeline_version = Column(String(20))

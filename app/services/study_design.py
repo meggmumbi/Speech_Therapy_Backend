@@ -26,12 +26,44 @@ from __future__ import annotations
 
 import hashlib
 import os
+import random
 import uuid
 from dataclasses import dataclass
 from typing import Literal, Mapping, Sequence
 
 Condition = Literal["K", "D"]
 ListLabel = Literal["A", "B"]
+
+
+# --- session types ----------------------------------------------------------
+#
+# A session is either a training block, where the robot gives feedback under
+# one of the two conditions, or an assessment, where it gives none.
+#
+# The distinction has to live in the data, not in how the experimenter ran the
+# app that day. Everything the study claims about learning comes from comparing
+# assessments; everything it claims about feedback comes from training blocks.
+# A session that cannot be told apart afterwards is unusable for either.
+
+TRAINING = "training"
+PRETEST = "pretest"
+POSTTEST = "posttest"
+DELAYED = "delayed"
+
+#: Assessments, in the order they are run. Production is rated by humans from
+#: these recordings; the robot says nothing that could teach or correct.
+ASSESSMENT_PHASES: tuple[str, ...] = (PRETEST, POSTTEST, DELAYED)
+SESSION_TYPES: tuple[str, ...] = (TRAINING,) + ASSESSMENT_PHASES
+
+
+def is_assessment(session_type: str | None) -> bool:
+    """Must this session withhold all feedback?
+
+    Defaults to False for an unknown or missing type, because a session that
+    was never stamped is an ad-hoc therapy session rather than a silent test,
+    and silently muting the robot would be the more confusing failure.
+    """
+    return session_type in ASSESSMENT_PHASES
 
 
 @dataclass(frozen=True)
@@ -138,6 +170,28 @@ def category_id_for_list(label: ListLabel) -> uuid.UUID:
         raise ListsNotConfigured(f"{env} is not a valid UUID: {raw!r}") from exc
 
 
+def test_category_id() -> uuid.UUID:
+    """The category holding the assessment items.
+
+    Separate from lists A and B on purpose. The test set has to contain items
+    from both training lists *and* untrained items sharing the same target
+    features, because generalisation to untrained words is the measure that
+    distinguishes learning from having memorised twelve words. A test set drawn
+    from one training list could not show it.
+    """
+    raw = os.getenv("STUDY_TEST_CATEGORY_ID")
+    if not raw:
+        raise ListsNotConfigured(
+            "STUDY_TEST_CATEGORY_ID is not set. Bind the assessment item set to "
+            "its activity category before running a pre-test or post-test."
+        )
+    try:
+        return uuid.UUID(raw)
+    except ValueError as exc:
+        raise ListsNotConfigured(
+            f"STUDY_TEST_CATEGORY_ID is not a valid UUID: {raw!r}") from exc
+
+
 def configured_lists() -> dict[str, str | None]:
     """What the lists are currently bound to, for the health/balance report."""
     out: dict[str, str | None] = {}
@@ -146,7 +200,42 @@ def configured_lists() -> dict[str, str | None]:
             out[label] = str(category_id_for_list(label))  # type: ignore[arg-type]
         except ListsNotConfigured:
             out[label] = None
+    try:
+        out["test"] = str(test_category_id())
+    except ListsNotConfigured:
+        out["test"] = None
     return out
+
+
+# --- item order -------------------------------------------------------------
+
+def new_order_seed() -> int:
+    """A fresh seed for one session's item order.
+
+    Bounded to 31 bits so it fits a plain integer column on any backend and
+    can be quoted in a paper without qualification.
+    """
+    return random.randrange(1, 2 ** 31 - 1)
+
+
+def order_items(item_ids: Sequence[str], seed: int | None) -> list[str]:
+    """Shuffle the items for one session, reproducibly.
+
+    Presentation order matters: without randomisation the last items always
+    carry the most fatigue and the first always the most novelty, and with
+    fixed lists that confound is identical for every participant, so it cannot
+    average out. Randomising per session removes it.
+
+    The seed is stored on the session rather than the order itself, so the
+    exact sequence any participant saw can be regenerated later from two
+    columns. ``seed = None`` returns the natural order unchanged, which is what
+    an unstamped ad-hoc session should get.
+    """
+    ordered = list(item_ids)
+    if seed is None:
+        return ordered
+    random.Random(seed).shuffle(ordered)
+    return ordered
 
 
 def validate_lists() -> list[str]:

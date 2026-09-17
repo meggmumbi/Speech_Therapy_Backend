@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, String, Boolean
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
@@ -24,6 +24,30 @@ class TherapySession(Base):
     # backend returns and the two conditions cannot drift apart in UI, timing
     # or scoring.
     condition = Column(String(1))
+
+    # What kind of session this is: 'training' (a counterbalanced block, with
+    # feedback) or one of 'pretest' / 'posttest' / 'delayed' (an assessment,
+    # with none). See services/study_design.SESSION_TYPES.
+    #
+    # NULL means an ad-hoc therapy session that was never part of the study.
+    # Those are allowed -- the app serves ordinary therapy too -- but a
+    # participant who has a counterbalancing assignment must never be run
+    # through one, and the scoring endpoint refuses to score into it. Every
+    # session recorded before 2026-09-17 is NULL, which is exactly the problem
+    # this column exists to stop recurring: none of them can be attributed to
+    # a condition.
+    session_type = Column(String(12))
+
+    # 1 or 2 for a training block; NULL for an assessment. Denormalised from
+    # the assignment so that a later change to the design table cannot rewrite
+    # what a stored session actually was.
+    block_index = Column(Integer)
+
+    # Seed for this session's item order. The order itself is not stored: it is
+    # regenerated from the seed, so the exact sequence a participant saw is
+    # reproducible from two columns rather than trusted to a log.
+    item_order_seed = Column(Integer)
+
     is_completed = Column(Boolean, default=False)
     child = relationship("Child")
     category = relationship("ActivityCategory")

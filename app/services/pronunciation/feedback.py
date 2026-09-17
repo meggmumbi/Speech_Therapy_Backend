@@ -170,6 +170,25 @@ GATED_PROMPT = "I didn't quite catch that. Could you say it once more?"
 # participant to repeat, because nothing will.
 MOVE_ON = "The word is {word}. Let's go on to the next one."
 
+# Said in an assessment session in place of any feedback at all.
+#
+# A pre-test that reacts to correctness is not a pre-test: the participant
+# learns from it, and the post-test then measures the assessment as much as the
+# training. But the robot cannot simply fall silent either -- a pause where
+# feedback normally goes is itself informative, and an unresponsive robot in a
+# turn-taking activity reads as a fault and stalls the session.
+#
+# So these are rotated regardless of the verdict. Every one is the same length
+# and carries the same information, which is none: no verdict, no re-model, no
+# invitation to try again. Rotation exists only so that ten identical utterances
+# in a row do not sound broken.
+ASSESSMENT_ACKS: tuple[str, ...] = (
+    "Thank you. Here is the next one.",
+    "Got it. Let's keep going.",
+    "Thanks. Next one now.",
+    "Okay. Here comes another.",
+)
+
 _ORDINALS = ("first", "second", "third", "fourth", "fifth", "sixth")
 
 # A phone scoring at or above this is not worth correcting, whatever the
@@ -183,8 +202,10 @@ class Feedback:
 
     speech: str                  # spoken by Pepper's TTS
     display: str                 # shown on the tablet
-    kind: Literal["praise", "correction", "stress", "repeat", "encourage"]
-    condition: Condition
+    kind: Literal["praise", "correction", "stress", "repeat", "encourage",
+                  "assessment"]
+    # None in an assessment session, which is run under no condition at all.
+    condition: Condition | None
     named_phone: str | None      # expected phone named, if any (for logging)
     cue_used: str | None
     remodel: bool                # did this utterance re-model the target word
@@ -310,6 +331,27 @@ def stress_sentence(result: AttemptScore) -> str | None:
 
 def _remodel(word: str) -> str:
     return f"Listen again: {word}."
+
+
+def assessment_acknowledgement(attempt_index: int = 0) -> Feedback:
+    """The robot's turn in an assessment session: content-free by construction.
+
+    Takes no ``result`` argument, and that is the point. There is no path from
+    the verdict to what gets said, so no future edit can make an assessment
+    leak correctness without changing this signature.
+    """
+    speech = ASSESSMENT_ACKS[attempt_index % len(ASSESSMENT_ACKS)]
+    return Feedback(
+        speech=speech,
+        display=speech,
+        kind="assessment",
+        # Assessments are run under no condition; saying K or D here would
+        # label rows that were never run under one.
+        condition=None,
+        named_phone=None,
+        cue_used=None,
+        remodel=False,
+    )
 
 
 def generate_feedback(
