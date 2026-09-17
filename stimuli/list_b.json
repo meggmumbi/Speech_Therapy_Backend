@@ -1,0 +1,215 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "cap"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "He wore a red cap to school.",
+        "target_word": "cap"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "cap",
+          "carp"
+        ],
+        "answer": "cap"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "bit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "She ate a small bit of bread.",
+        "target_word": "bit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "bit",
+          "beat"
+        ],
+        "answer": "bit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The glass is full of water.",
+        "target_word": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "full",
+          "fool"
+        ],
+        "answer": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "three"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "There are three books on the desk.",
+        "target_word": "three"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "three",
+          "tree"
+        ],
+        "answer": "three"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "We cooked rice for dinner.",
+        "target_word": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "rice",
+          "lice"
+        ],
+        "answer": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "camera"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The camera is on the shelf.",
+        "target_word": "camera"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-sentence"
+    },
+    {
+      "exercise_type": "schwa_spot",
+      "spec": {
+        "word": "camera",
+        "syllables": [
+          "ca",
+          "me",
+          "ra"
+        ],
+        "answer_indices": [
+          1,
+          2
+        ]
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-tap"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "economic"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "They discussed the economic report.",
+        "target_word": "economic"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-sentence"
+    },
+    {
+      "exercise_type": "stress_place",
+      "spec": {
+        "word": "economic",
+        "syllables": [
+          "e",
+          "co",
+          "no",
+          "mic"
+        ],
+        "answer_index": 2
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-tap"
+    }
+  ]
+}

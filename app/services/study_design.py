@@ -149,20 +149,45 @@ class ListsNotConfigured(RuntimeError):
     """The A/B word lists have not been bound to activity categories."""
 
 
-def category_id_for_list(label: ListLabel) -> uuid.UUID:
+def _role_from_db(db, role: str) -> uuid.UUID | None:
+    """The category claiming this study role, if the database says so.
+
+    Phase 3 moved list binding out of environment variables and into
+    `activity_categories.study_role`. The variables remain as a fallback so a
+    deployment mid-study does not change under anyone, but the database is
+    preferred: a fact about the experiment does not belong in a file that is
+    not in version control, and the unset variables are what blocked the first
+    study run.
+    """
+    if db is None:
+        return None
+    from .. import models  # local: models import the database, which imports config
+    row = (
+        db.query(models.ActivityCategory.id)
+        .filter(models.ActivityCategory.study_role == role)
+        .first()
+    )
+    return row[0] if row else None
+
+
+def category_id_for_list(label: ListLabel, db=None) -> uuid.UUID:
     """Resolve a word-list label to its activity category.
 
-    The two lists are ordinary activity categories; which ones they are is
-    deployment configuration, set once before the study from the pilot's
-    difficulty matching. Kept out of the database schema so that re-matching
-    the lists after the pilot does not need a migration.
+    The two lists are ordinary activity categories marked with a `study_role`.
+    Pass a session to use that; without one this falls back to the environment
+    variable, which is how the pure design tests exercise it.
     """
+    from .exercises import ROLE_FOR_LIST
+    found = _role_from_db(db, ROLE_FOR_LIST[label])
+    if found is not None:
+        return found
+
     env = f"STUDY_LIST_{label}_CATEGORY_ID"
     raw = os.getenv(env)
     if not raw:
         raise ListsNotConfigured(
-            f"{env} is not set. Bind word lists {' and '.join(('A', 'B'))} to "
-            "their activity categories before starting study sessions."
+            f"No category is marked as study list {label}. Set its study_role "
+            f"to {ROLE_FOR_LIST[label]!r}, or set {env}."
         )
     try:
         return uuid.UUID(raw)
@@ -170,7 +195,7 @@ def category_id_for_list(label: ListLabel) -> uuid.UUID:
         raise ListsNotConfigured(f"{env} is not a valid UUID: {raw!r}") from exc
 
 
-def test_category_id() -> uuid.UUID:
+def test_category_id(db=None) -> uuid.UUID:
     """The category holding the assessment items.
 
     Separate from lists A and B on purpose. The test set has to contain items
@@ -179,11 +204,16 @@ def test_category_id() -> uuid.UUID:
     distinguishes learning from having memorised twelve words. A test set drawn
     from one training list could not show it.
     """
+    from .exercises import TEST_SET
+    found = _role_from_db(db, TEST_SET)
+    if found is not None:
+        return found
+
     raw = os.getenv("STUDY_TEST_CATEGORY_ID")
     if not raw:
         raise ListsNotConfigured(
-            "STUDY_TEST_CATEGORY_ID is not set. Bind the assessment item set to "
-            "its activity category before running a pre-test or post-test."
+            "No category is marked as the assessment set. Set its study_role "
+            "to 'test', or set STUDY_TEST_CATEGORY_ID."
         )
     try:
         return uuid.UUID(raw)
@@ -192,16 +222,16 @@ def test_category_id() -> uuid.UUID:
             f"STUDY_TEST_CATEGORY_ID is not a valid UUID: {raw!r}") from exc
 
 
-def configured_lists() -> dict[str, str | None]:
+def configured_lists(db=None) -> dict[str, str | None]:
     """What the lists are currently bound to, for the health/balance report."""
     out: dict[str, str | None] = {}
     for label in ("A", "B"):
         try:
-            out[label] = str(category_id_for_list(label))  # type: ignore[arg-type]
+            out[label] = str(category_id_for_list(label, db))  # type: ignore[arg-type]
         except ListsNotConfigured:
             out[label] = None
     try:
-        out["test"] = str(test_category_id())
+        out["test"] = str(test_category_id(db))
     except ListsNotConfigured:
         out["test"] = None
     return out
@@ -238,13 +268,13 @@ def order_items(item_ids: Sequence[str], seed: int | None) -> list[str]:
     return ordered
 
 
-def validate_lists() -> list[str]:
+def validate_lists(db=None) -> list[str]:
     """Problems with the current list configuration, empty if it is sound."""
     problems: list[str] = []
     resolved: dict[str, str] = {}
     for label in ("A", "B"):
         try:
-            resolved[label] = str(category_id_for_list(label))  # type: ignore[arg-type]
+            resolved[label] = str(category_id_for_list(label, db))  # type: ignore[arg-type]
         except ListsNotConfigured as exc:
             problems.append(str(exc))
     if len(resolved) == 2 and resolved["A"] == resolved["B"]:
@@ -252,6 +282,17 @@ def validate_lists() -> list[str]:
             "lists A and B are bound to the same category; the counterbalance "
             "requires two distinct, difficulty-matched lists"
         )
+    try:
+        test = str(test_category_id(db))
+        for label, category in resolved.items():
+            if category == test:
+                problems.append(
+                    f"the assessment set is bound to the same category as list "
+                    f"{label}; generalisation to untrained words is what "
+                    f"separates learning from memorising the training list"
+                )
+    except ListsNotConfigured as exc:
+        problems.append(str(exc))
     return problems
 
 

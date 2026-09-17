@@ -14,16 +14,20 @@ sessions must be created here so the condition is never implicit.
 
 from __future__ import annotations
 
+import random
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from .. import models
 from ..database import get_db
-from ..services import study_design
+from ..schemas import exercise_spec
+from ..services import exercises, study_design
+from ..services.pronunciation.feedback import (assessment_acknowledgement,
+                                               perception_feedback)
 from ..utils.auth import get_current_user
 
 router = APIRouter(tags=["study"])
@@ -178,12 +182,12 @@ def start_block_session(
     if assignment.excluded:
         raise HTTPException(409, "Participant is excluded from the study")
 
-    problems = study_design.validate_lists()
+    problems = study_design.validate_lists(db)
     if problems:
         raise HTTPException(503, "; ".join(problems))
 
     block = study_design.block_for(assignment.group_index, request.block)
-    category_id = study_design.category_id_for_list(block.word_list)
+    category_id = study_design.category_id_for_list(block.word_list, db)
 
     category = (
         db.query(models.ActivityCategory)
@@ -279,7 +283,7 @@ def start_assessment_session(
         raise HTTPException(409, "Participant is excluded from the study")
 
     try:
-        category_id = study_design.test_category_id()
+        category_id = study_design.test_category_id(db)
     except study_design.ListsNotConfigured as exc:
         raise HTTPException(503, str(exc)) from exc
 
@@ -369,17 +373,168 @@ def session_items(session_id: uuid.UUID, db: Session = Depends(get_db)):
         "condition": session.condition,
         "gives_feedback": not study_design.is_assessment(session.session_type),
         "item_order_seed": session.item_order_seed,
-        "items": [
-            {
-                "id": str(by_id[item_id].id),
-                "name": by_id[item_id].name,
-                "description": by_id[item_id].description,
-                "image_url": by_id[item_id].image_url,
-                "audio_url": by_id[item_id].audio_url,
-                "difficulty_level": by_id[item_id].difficulty_level,
-            }
-            for item_id in ordered_ids
-        ],
+        "items": [_present(by_id[item_id], session.item_order_seed)
+                  for item_id in ordered_ids],
+    }
+
+
+def _present(item: models.ActivityItem, seed: int | None) -> dict:
+    """One item as the tablet should see it.
+
+    The answer key is removed. For a tap-answer item the options go to the
+    device and the key does not: grading happens here, so the correct answer is
+    never sitting in a payload on a tablet a participant is holding. Option
+    order is shuffled from the session's seed as well, so the key's position
+    cannot be inferred from a fixed layout and the shuffle is still
+    reproducible from the session row.
+    """
+    exercise_type = item.effective_type
+    body: dict = {
+        "id": str(item.id),
+        "name": item.name,
+        "description": item.description,
+        "image_url": item.image_url,
+        "audio_url": item.audio_url,
+        "difficulty_level": item.difficulty_level,
+        "exercise_type": exercise_type,
+        "target_feature": item.target_feature,
+        "needs_speech": exercises.needs_asr(exercise_type),
+        "presentation": {},
+    }
+
+    spec = dict(item.spec or {})
+    spec.pop("answer", None)
+    spec.pop("answer_index", None)
+    spec.pop("answer_indices", None)
+    if "options" in spec:
+        options = list(spec["options"])
+        if seed is not None:
+            random.Random(seed ^ hash(str(item.id)) & 0x7FFFFFFF).shuffle(options)
+        spec["options"] = options
+    body["presentation"] = spec
+    return body
+
+
+class AnswerRequest(BaseModel):
+    item_id: uuid.UUID
+    #: A tapped option, or the syllable indices chosen. Shape follows the
+    #: exercise type.
+    answer: str | int | list[int] | None = None
+    response_time_seconds: float | None = None
+
+
+@router.post("/sessions/{session_id}/answers")
+def record_answer(
+    session_id: uuid.UUID,
+    request: AnswerRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    """Record a tapped answer, graded here rather than on the tablet.
+
+    The other half of the fork that `/pronunciation/.../attempts` handles. A
+    perception item never touches the acoustic model, which is the point: six
+    of twenty pilot participants said the robot could not hear Kenyan English,
+    and an exercise with no recogniser in it cannot false-reject anyone.
+
+    Grading is server-side because the answer key is deliberately not sent to
+    the device. It is also exact, never fuzzy: the participant tapped one of
+    the strings this item supplied, so anything else means the client sent
+    something that was not offered.
+    """
+    session = (
+        db.query(models.TherapySession)
+        .filter(models.TherapySession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    item = (
+        db.query(models.ActivityItem)
+        .filter(models.ActivityItem.id == request.item_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(404, "Item not found")
+    if item.category_id != session.category_id:
+        raise HTTPException(
+            400, "That item does not belong to this session's word list")
+
+    exercise_type = item.effective_type
+    if exercises.needs_asr(exercise_type):
+        raise HTTPException(
+            400,
+            f"{exercise_type} is answered by speaking. Send the recording to "
+            f"/pronunciation/sessions/{session_id}/attempts instead.")
+
+    # Same refusal the scoring endpoint makes: an unstamped session belonging
+    # to an enrolled participant produces rows that cannot be attributed to a
+    # condition afterwards.
+    if session.session_type is None:
+        assigned = (
+            db.query(models.StudyAssignment)
+            .filter(models.StudyAssignment.child_id == session.child_id)
+            .first()
+        )
+        if assigned and not assigned.excluded:
+            raise HTTPException(
+                409,
+                f"session {session_id} was not created as a study session, but "
+                f"this participant is enrolled. Start it from the study plan.")
+
+    try:
+        correct = exercise_spec.is_correct(exercise_type, item.spec or {}, request.answer)
+    except (ValidationError, ValueError) as exc:
+        raise HTTPException(422, f"could not grade this answer: {exc}") from exc
+
+    is_assessment = study_design.is_assessment(session.session_type)
+    attempt_number = 1 + (
+        db.query(models.SessionActivity)
+        .filter(models.SessionActivity.session_id == session_id,
+                models.SessionActivity.item_id == request.item_id)
+        .count()
+    )
+
+    activity = models.SessionActivity(
+        session_id=session_id,
+        item_id=request.item_id,
+        attempt_number=attempt_number,
+        is_correct=correct,
+        response_type="select",
+        exercise_type=exercise_type,
+        selected_answer=request.answer,
+        response_time_seconds=request.response_time_seconds,
+        condition=None if is_assessment else session.condition,
+        verdict="correct" if correct else "incorrect",
+        created_at=datetime.utcnow(),
+    )
+    db.add(activity)
+    db.commit()
+    db.refresh(activity)
+
+    if is_assessment:
+        feedback = assessment_acknowledgement(attempt_index=attempt_number - 1)
+    else:
+        feedback = perception_feedback(correct)
+
+    return {
+        "attempt_id": str(activity.id),
+        "attempt_number": attempt_number,
+        "session_type": session.session_type,
+        "exercise_type": exercise_type,
+        # No condition on a tapped item even in a training block. K and D are
+        # ways of wording pronunciation feedback; there is no pronunciation
+        # here to word feedback about, so applying one would put a condition
+        # label on rows the manipulation never touched.
+        "condition": None,
+        "gives_feedback": not is_assessment,
+        "is_correct": correct,
+        "feedback": {
+            "speech": feedback.speech,
+            "display": feedback.display,
+            "kind": feedback.kind,
+        },
     }
 
 
@@ -449,7 +604,7 @@ def participant_plan(child_id: uuid.UUID, db: Session = Depends(get_db)):
         "assignment": _serialise(assignment) if assignment else None,
         "steps": steps,
         "unstamped_sessions": unstamped,
-        "list_problems": study_design.validate_lists(),
+        "list_problems": study_design.validate_lists(db),
     }
 
 
@@ -469,13 +624,13 @@ def balance(db: Session = Depends(get_db)):
     return {
         **report,
         "excluded": excluded,
-        "word_lists": study_design.configured_lists(),
-        "list_problems": study_design.validate_lists(),
+        "word_lists": study_design.configured_lists(db),
+        "list_problems": study_design.validate_lists(db),
     }
 
 
 @router.get("/design")
-def design():
+def design(db: Session = Depends(get_db)):
     """The design itself, so the experimenter can check what will be run."""
     return {
         "groups": [
@@ -483,6 +638,6 @@ def design():
              "blocks": study_design.session_plan(g)}
             for g in range(study_design.N_GROUPS)
         ],
-        "word_lists": study_design.configured_lists(),
-        "list_problems": study_design.validate_lists(),
+        "word_lists": study_design.configured_lists(db),
+        "list_problems": study_design.validate_lists(db),
     }

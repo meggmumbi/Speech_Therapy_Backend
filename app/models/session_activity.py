@@ -18,6 +18,18 @@ class SessionActivity(Base):
     is_correct = Column(Boolean)
     response_type = Column(String(10))  # 'verbal' or 'select'
     response_text = Column(String)
+
+    # What this attempt was run as, copied from the item at the time. NULL
+    # means repeat_word, like every attempt recorded before Phase 3.
+    #
+    # Denormalised for the same reason `condition` and `block_index` are:
+    # editing an item next month must not rewrite what a stored attempt
+    # actually was. A perception item later retyped as a production item would
+    # otherwise silently move its history into the production results.
+    exercise_type = Column(String(24))
+    # The option tapped, or the syllable indices chosen. Null for spoken items,
+    # where the answer is the recording.
+    selected_answer = Column(JSON)
     feedback = Column(String)
     pronunciation_score = Column(Float)
     response_time_seconds = Column(Float)

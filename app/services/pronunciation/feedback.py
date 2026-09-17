@@ -203,7 +203,7 @@ class Feedback:
     speech: str                  # spoken by Pepper's TTS
     display: str                 # shown on the tablet
     kind: Literal["praise", "correction", "stress", "repeat", "encourage",
-                  "assessment"]
+                  "assessment", "perception"]
     # None in an assessment session, which is run under no condition at all.
     condition: Condition | None
     named_phone: str | None      # expected phone named, if any (for logging)
@@ -347,6 +347,45 @@ def assessment_acknowledgement(attempt_index: int = 0) -> Feedback:
         kind="assessment",
         # Assessments are run under no condition; saying K or D here would
         # label rows that were never run under one.
+        condition=None,
+        named_phone=None,
+        cue_used=None,
+        remodel=False,
+    )
+
+
+#: Tap-answer feedback. Identical under both conditions, deliberately.
+#:
+#: K and D differ in how a *pronunciation* correction is worded -- whether the
+#: robot re-models the word or names the sound that went wrong. A perception
+#: item has no pronunciation to correct, so there is nothing for the two
+#: conditions to differ about, and inventing a difference would put a
+#: manipulation where the design never specified one.
+PERCEPTION_CORRECT: tuple[str, ...] = (
+    "Yes, that's the one.",
+    "That's right.",
+    "Correct.",
+)
+PERCEPTION_INCORRECT: tuple[str, ...] = (
+    "Not that one. Let's keep going.",
+    "That wasn't it. Next one.",
+    "No, not that one. Here's another.",
+)
+
+
+def perception_feedback(is_correct: bool, attempt_index: int = 0) -> Feedback:
+    """What the robot says about a tapped answer in a training block.
+
+    Says whether it was right and nothing more. No re-model, no named phone:
+    there is no production to diagnose, and a correction phrased as though
+    there were would be feedback about something the participant did not do.
+    """
+    bank = PERCEPTION_CORRECT if is_correct else PERCEPTION_INCORRECT
+    speech = bank[attempt_index % len(bank)]
+    return Feedback(
+        speech=speech,
+        display=speech,
+        kind="perception",
         condition=None,
         named_phone=None,
         cue_used=None,

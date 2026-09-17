@@ -1,0 +1,172 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "hat"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "cap"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "match"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "ship"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "bit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "fill"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "pull"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "look"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "think"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "three"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "thin"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "right"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "road"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "banana"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "camera"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "together"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "photography"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "economic"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "industrial"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-novel"
+    }
+  ]
+}

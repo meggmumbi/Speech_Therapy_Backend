@@ -17,6 +17,16 @@ class ActivityCategory(Base):
     type = Column(String(50))
     difficulty_level = Column(String(20))
 
+    # Which part of the study this category is: training list A, training list
+    # B, the assessment set, or NULL for an ordinary practice category.
+    #
+    # This used to live in three environment variables on the server. A fact
+    # about the experiment was being kept in deployment configuration that is
+    # not in version control, and as of 2026-09-17 was unset, which is what was
+    # blocking a study run. Unique where it is set, because two categories both
+    # claiming to be list A is not a state the design can be run from.
+    study_role = Column(String(12), unique=True)
+
     items = relationship(
         "ActivityItem",
         back_populates="category",
