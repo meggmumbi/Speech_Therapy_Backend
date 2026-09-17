@@ -431,6 +431,11 @@ class AnswerRequest(BaseModel):
     #: exercise type.
     answer: str | int | list[int] | None = None
     response_time_seconds: float | None = None
+    #: Replays before answering. On a perception item this matters more than
+    #: anywhere else: the stimulus *is* the question, so how many times it was
+    #: heard is part of what the trial measured.
+    prompt_replays: int = 0
+    slow_replay_used: bool = False
 
 
 @router.post("/sessions/{session_id}/answers")
@@ -515,6 +520,9 @@ def record_answer(
         exercise_type=exercise_type,
         selected_answer=request.answer,
         response_time_seconds=request.response_time_seconds,
+        prompt_replays=max(0, request.prompt_replays),
+        slow_replay_used=bool(request.slow_replay_used),
+        skipped=False,
         condition=None if is_assessment else session.condition,
         verdict="correct" if correct else "incorrect",
         created_at=datetime.utcnow(),
@@ -545,6 +553,132 @@ def record_answer(
             "display": feedback.display,
             "kind": feedback.kind,
         },
+    }
+
+
+class SkipRequest(BaseModel):
+    item_id: uuid.UUID
+    #: cant_say | cant_hear | other. Why, not whether: "could not hear the
+    #: model" and "would rather not attempt this word" mean different things
+    #: for the item and only one of them is about the participant.
+    reason: str = "other"
+    prompt_replays: int = 0
+    slow_replay_used: bool = False
+
+
+@router.post("/sessions/{session_id}/skip")
+def skip_item(
+    session_id: uuid.UUID,
+    request: SkipRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    """The participant declined this item.
+
+    Recorded, and recorded as a skip rather than an error. A person who could
+    not produce a word and a person who produced it wrongly are different
+    observations, and storing the first as the second is the false rejection
+    this system exists to avoid, arriving by another route.
+
+    It exists because a stuck item otherwise ends the session. That was a real
+    failure in the pilot: an item the recogniser would not accept had no way
+    out except abandoning everything after it.
+    """
+    session = (
+        db.query(models.TherapySession)
+        .filter(models.TherapySession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(404, "Session not found")
+    item = (
+        db.query(models.ActivityItem)
+        .filter(models.ActivityItem.id == request.item_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(404, "Item not found")
+
+    reason = request.reason if request.reason in SKIP_REASONS else "other"
+    attempt_number = 1 + (
+        db.query(models.SessionActivity)
+        .filter(models.SessionActivity.session_id == session_id,
+                models.SessionActivity.item_id == request.item_id)
+        .count()
+    )
+    activity = models.SessionActivity(
+        session_id=session_id,
+        item_id=request.item_id,
+        attempt_number=attempt_number,
+        is_correct=None,
+        exercise_type=item.effective_type,
+        skipped=True,
+        skip_reason=reason,
+        verdict="skipped",
+        prompt_replays=request.prompt_replays,
+        slow_replay_used=request.slow_replay_used,
+        condition=None if study_design.is_assessment(session.session_type) else session.condition,
+        created_at=datetime.utcnow(),
+    )
+    db.add(activity)
+    db.commit()
+    db.refresh(activity)
+    return {
+        "attempt_id": str(activity.id),
+        "item_id": str(request.item_id),
+        "skipped": True,
+        "reason": reason,
+        # Nothing to say about it. Under either condition and in an assessment,
+        # a skip is acknowledged and the session moves on.
+        "feedback": {"speech": "That's alright. Here is the next one.",
+                     "display": "Skipped", "kind": "assessment"},
+    }
+
+
+SKIP_REASONS = ("cant_say", "cant_hear", "other")
+
+
+class CompleteRequest(BaseModel):
+    ended_early: bool = False
+
+
+@router.post("/sessions/{session_id}/complete")
+def complete_session(
+    session_id: uuid.UUID,
+    request: CompleteRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    """Mark a session finished and stamp its end time.
+
+    `end_time` was only ever set by the ad-hoc `/activities/next-item` route. A
+    study session walks a fixed list on the device and never calls it, so every
+    study session had `end_time` NULL and every summary reported a duration of
+    zero minutes.
+
+    `ended_early` is kept separately because a session with fifteen of
+    twenty-one items is not a short session, it is an incomplete one, and
+    averaging the two would understate how long the protocol takes.
+    """
+    session = (
+        db.query(models.TherapySession)
+        .filter(models.TherapySession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    if session.end_time is None:
+        session.end_time = datetime.utcnow()
+    session.is_completed = True
+    session.ended_early = bool(request.ended_early)
+    db.commit()
+    db.refresh(session)
+    return {
+        "session_id": str(session.id),
+        "is_completed": True,
+        "ended_early": bool(session.ended_early),
+        "end_time": session.end_time.isoformat(),
     }
 
 

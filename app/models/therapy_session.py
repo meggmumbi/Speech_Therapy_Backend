@@ -49,6 +49,11 @@ class TherapySession(Base):
     item_order_seed = Column(Integer)
 
     is_completed = Column(Boolean, default=False)
+
+    # The researcher stopped this session before the last item. Recorded
+    # because a session with fifteen of twenty-one items is not a short session
+    # -- it is an incomplete one, and the two must not be averaged together.
+    ended_early = Column(Boolean)
     child = relationship("Child")
     category = relationship("ActivityCategory")
     activities = relationship("SessionActivity", back_populates="session")

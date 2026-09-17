@@ -30,6 +30,34 @@ class SessionActivity(Base):
     # The option tapped, or the syllable indices chosen. Null for spoken items,
     # where the answer is the recording.
     selected_answer = Column(JSON)
+
+    # --- Phase 4: what the participant did before answering -----------------
+    # P18 said the pacing was too fast and P6 asked for time to process, so the
+    # prompt can be replayed. An item heard four times is not the same trial as
+    # one heard once, and an analysis that cannot tell them apart is averaging
+    # two different things.
+    prompt_replays = Column(Integer)
+    # Slowing the model down changes the stimulus, not only the pacing, so it
+    # is recorded separately from the count.
+    slow_replay_used = Column(Boolean)
+
+    # Declined. Excluded from correction-rate denominators exactly as `gated`
+    # is, but kept separate because the reason differs: gated means the
+    # recogniser was not confident, skipped means the person chose not to
+    # answer. Storing a skip as an error would be a false rejection arriving
+    # through the back door.
+    skipped = Column(Boolean)
+    skip_reason = Column(String(20))   # cant_say | cant_hear | other
+
+    # Was the robot instructed to celebrate this attempt? Not inferable from
+    # is_correct, which is true in assessments too, where nothing is performed.
+    #
+    # Records the instruction, not the performance: if the robot had lost focus
+    # it stayed still and this column will not know. That limit is worth
+    # stating, because three pilot participants named the movement and the
+    # "yay" unprompted as what gave them confidence, and a per-session count of
+    # instructed celebrations is the granularity that claim can be tested at.
+    celebration_shown = Column(Boolean)
     feedback = Column(String)
     pronunciation_score = Column(Float)
     response_time_seconds = Column(Float)

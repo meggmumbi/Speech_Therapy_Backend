@@ -207,6 +207,12 @@ async def score_pronunciation_attempt(
     prompt_ended_at: str | None = Form(None),
     speech_started_at: str | None = Form(None),
     speech_ended_at: str | None = Form(None),
+    # How many times the participant asked to hear the prompt again before
+    # answering, and whether any of those was the slow replay. An item heard
+    # four times is not the same trial as one heard once, and slowing the model
+    # changes the stimulus rather than only the pacing.
+    prompt_replays: int = Form(0),
+    slow_replay_used: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """Score one spoken attempt and return the robot's next utterance."""
@@ -357,6 +363,10 @@ async def score_pronunciation_attempt(
         prompt_ended_at=_parse_instant(prompt_ended_at),
         speech_started_at=_parse_instant(speech_started_at),
         speech_ended_at=_parse_instant(speech_ended_at),
+        prompt_replays=max(0, prompt_replays),
+        slow_replay_used=bool(slow_replay_used),
+        skipped=False,
+        celebration_shown=(feedback.kind == "praise"),
         audio_peak=quality.peak,
         audio_rms_dbfs=_finite(quality.rms_dbfs),
         audio_clipped_fraction=quality.clipped_fraction,
