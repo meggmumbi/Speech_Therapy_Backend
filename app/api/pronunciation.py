@@ -32,7 +32,8 @@ from ..database import get_db
 from .. import models
 from ..models import ActivityItem, SessionActivity, TherapySession
 from ..services import study_design
-from ..services.pronunciation import asr, score_attempt
+from ..services import exercises
+from ..services.pronunciation import asr, score_attempt, score_sentence
 from ..services.pronunciation.audio import assess_quality, to_mono_float32
 from ..services.pronunciation.feedback import (assessment_acknowledgement,
                                                generate_feedback)
@@ -281,9 +282,21 @@ async def score_pronunciation_attempt(
     # still produces a confident, entirely wrong verdict, and on 2026-09-15 it
     # did, with nothing in the stored row to say so. Bounds come from the
     # pipeline config so the guard and the scorer agree on what is too short.
+    # What the participant was asked to say. Until now this was item.name in
+    # every case, and for a read-aloud item item.name is the *target word*:
+    # the participant read "He ate a banana for lunch." and the scorer aligned
+    # all of it against the six phones of "banana". Every correctly read
+    # sentence came back "incorrect", which is the failure last week's
+    # recordings show on every sentence item.
+    exercise_type = item.effective_type
+    spec = item.spec or {}
+    sentence = spec.get("sentence") if exercise_type == exercises.READ_SENTENCE else None
+    spoken_target = str(spec.get("target_word") or spec.get("word") or item.name)
+    max_speech = config.max_sentence_seconds if sentence else config.max_audio_seconds
+
     quality = assess_quality(waveform, sample_rate,
                              min_speech_s=config.min_audio_seconds,
-                             max_speech_s=config.max_audio_seconds)
+                             max_speech_s=max_speech)
 
     prior = db.query(SessionActivity).filter(
         SessionActivity.session_id == session_id,
@@ -295,13 +308,19 @@ async def score_pronunciation_attempt(
     # item without the participant ever having been scored.
     scored_before = sum(1 for a in prior if not a.gated)
 
-    result = score_attempt(
-        str(item.name), waveform, sample_rate, get_model(), config,
-        transcript=transcript,
-        # Server-side recognition, invoked only if the acoustics say wrong and
-        # the client sent nothing to check that against. See services/asr.py.
-        transcript_provider=asr.provider_for(config.server_asr),
-    )
+    # Server-side recognition, invoked only if the acoustics say wrong and the
+    # client sent nothing to check that against. See services/asr.py.
+    provider = asr.provider_for(config.server_asr)
+    if sentence:
+        result = score_sentence(
+            sentence, spoken_target, waveform, sample_rate, get_model(), config,
+            transcript=transcript, transcript_provider=provider,
+        )
+    else:
+        result = score_attempt(
+            spoken_target, waveform, sample_rate, get_model(), config,
+            transcript=transcript, transcript_provider=provider,
+        )
 
     gated = result.verdict in ("gated", "unscorable")
     # Whether another attempt at this item follows. The client must not decide
@@ -326,9 +345,10 @@ async def score_pronunciation_attempt(
     else:
         # attempt_number - 1 so the first attempt of an item draws index 0, and
         # K and D draw the same warmth marker at the same point in a session.
-        feedback = generate_feedback(result, str(item.name), condition,
+        feedback = generate_feedback(result, spoken_target, condition,
                                      attempt_index=attempt_number - 1,
-                                     retry_available=retry_available)
+                                     retry_available=retry_available,
+                                     sentence=sentence)
 
     audio_ref = _persist_audio(raw, session_id, item_id, attempt_number)
 
@@ -367,6 +387,10 @@ async def score_pronunciation_attempt(
         slow_replay_used=bool(slow_replay_used),
         skipped=False,
         celebration_shown=(feedback.kind == "praise"),
+        # Copied from the item at the time. Last week every sentence attempt
+        # was stored as NULL, i.e. repeat_word, and the summary could not tell
+        # a read-aloud error from a single-word one.
+        exercise_type=exercise_type,
         audio_peak=quality.peak,
         audio_rms_dbfs=_finite(quality.rms_dbfs),
         audio_clipped_fraction=quality.clipped_fraction,

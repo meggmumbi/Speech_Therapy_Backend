@@ -333,6 +333,49 @@ between participants, which the four-box version was not.
 
 ---
 
+## Interlude, 2026-09-25: what the first real sessions showed
+
+The researcher ran training blocks on 2026-09-18 and reported four things.
+Each turned out to be real, and three were the same kind of bug: a decision
+made for single words that nobody revisited when sentences arrived.
+
+**Every read-aloud sentence was marked wrong.** The scoring endpoint passed
+`item.name` as the reference, and for a sentence item that is the *target
+word*. The participant read "He ate a banana for lunch." and the aligner laid
+twenty-five phones over the six of "banana". The transcript column showed the
+sentence read perfectly on every one. Fixed by `score_sentence`: the whole
+sentence is aligned so the carrier words anchor the target, and every
+judgement is made over the target's phones alone. Re-scoring the stored audio
+of 2026-09-18 through the fixed path: 13/42 correct before, 40/42 after. The
+two that stay wrong are "cup" for "cap", which the recogniser also heard.
+
+**"Turn right at the next corner" was unscorable: too long.** The 4 s ceiling
+and the recorder's 5 s cap were sized for one word. Sentences now get 10 s on
+the server and 12 s with a longer silence hangover on the tablet.
+
+**Pepper did not say the prompt until the speaker was tapped.** Two Say actions
+were being started at once: the plan screen's greeting was still playing when
+the session asked for the item prompt, the second Say threw, and its callback
+fired as though it had been spoken. All robot speech now goes through one
+queue and is spoken in order.
+
+**The supervisor could not tell K from D.** Two reasons in the data. D fell
+back to K's exact wording whenever no phone was nameable, which after the
+sentence bug was most of the time. And even when D did diagnose, it never said
+what the participant had actually produced. D now says it: "I heard cup. The
+word is cap. The sound to fix is the a sound, as in cat. Drop your jaw and
+spread your lips. Listen again: cap." The heard word comes from the
+recogniser's transcript, not the phone alignment, because whole-word
+recognition is a different and far more reliable signal than phone-pair
+identification. For tapped items, D now shows and names the right answer after
+a wrong one, and K does not, so tapped rows carry the condition from here on.
+
+`docs/CONSOLE.md` scopes the research console the researcher proposed. It is
+the right call: the stimulus lists should not live in a script, and the
+perception-item audio needs somewhere to be recorded.
+
+---
+
 ## Phase 6 — rater tooling and analysis
 
 - Stratified sampler for the rating set; blind randomised playback UI.

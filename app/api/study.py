@@ -550,21 +550,23 @@ def record_answer(
     db.commit()
     db.refresh(activity)
 
+    condition = None if is_assessment else session.condition
+    reveal = None if (is_assessment or correct) else _reveal(exercise_type, item.spec or {})
     if is_assessment:
         feedback = assessment_acknowledgement(attempt_index=attempt_number - 1)
     else:
-        feedback = perception_feedback(correct)
+        feedback = perception_feedback(correct, attempt_index=attempt_number - 1,
+                                       condition=condition,
+                                       reveal=reveal["speech"] if reveal else None)
 
     return {
         "attempt_id": str(activity.id),
         "attempt_number": attempt_number,
         "session_type": session.session_type,
         "exercise_type": exercise_type,
-        # No condition on a tapped item even in a training block. K and D are
-        # ways of wording pronunciation feedback; there is no pronunciation
-        # here to word feedback about, so applying one would put a condition
-        # label on rows the manipulation never touched.
-        "condition": None,
+        # Tapped items carry the condition now. In D a wrong tap is followed by
+        # the answer, in K it is not, so the manipulation touches these rows.
+        "condition": condition,
         "gives_feedback": not is_assessment,
         "is_correct": correct,
         "feedback": {
@@ -572,7 +574,46 @@ def record_answer(
             "display": feedback.display,
             "kind": feedback.kind,
         },
+        # Only in D, only after a wrong answer: what to highlight on the
+        # tablet. The key never travels otherwise.
+        "reveal": reveal if condition == "D" else None,
     }
+
+
+_ORDINAL_WORDS = ("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth")
+
+
+def _reveal(exercise_type: str, spec: dict) -> dict | None:
+    """The correct answer, in the shape the tablet highlights and the words
+    the robot says. Diagnostic feedback for a tap item is exactly this: not a
+    phone to fix, but which one was right."""
+    if exercise_type == exercises.STRESS_PLACE:
+        syllables = list(spec.get("syllables", []))
+        index = spec.get("answer_index")
+        if index is None or index >= len(syllables):
+            return None
+        return {"index": index,
+                "speech": f"The strongest syllable is {syllables[index]}, "
+                          f"the {_ORDINAL_WORDS[index]} one."}
+    if exercise_type == exercises.SCHWA_SPOT:
+        syllables = list(spec.get("syllables", []))
+        indices = sorted(spec.get("answer_indices", []))
+        if not indices or any(i >= len(syllables) for i in indices):
+            return None
+        names = [syllables[i] for i in indices]
+        joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        plural = "syllable is" if len(names) == 1 else "syllables are"
+        return {"indices": indices, "speech": f"The weak {plural} {joined}."}
+    answer = spec.get("answer")
+    if not answer:
+        return None
+    if exercise_type == exercises.MINIMAL_PAIR_ID:
+        speech = f"The word you heard was {answer}."
+    elif exercise_type == exercises.SAME_SOUND_MATCH:
+        speech = f"The one with the same sound is {answer}."
+    else:
+        speech = f"The answer is {answer}."
+    return {"option": answer, "speech": speech}
 
 
 class SkipRequest(BaseModel):

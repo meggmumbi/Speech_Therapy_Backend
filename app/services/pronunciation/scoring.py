@@ -131,6 +131,7 @@ def _score_variant(
     phone_log_probs: np.ndarray,
     phone_to_id: dict[str, int],
     frame_weights: np.ndarray,
+    positions: Sequence[int] | None = None,
 ) -> tuple[float, list[PhoneScore], list, list[tuple[str, str]]] | None:
     """Forced-align and GOP-score one dictionary variant. None if unalignable.
 
@@ -154,14 +155,15 @@ def _score_variant(
     # CTC peaks are one frame wide; widen them to real phone segments before
     # averaging anything over them.
     spans = expand_spans(spans, emissions.n_frames)
-    # Single words in the confirmatory study, so the whole variant is one
-    # word; position tells the layer whether a phone is word-initial, medial
-    # or final, which it learned to weight differently.
+    # Position tells the MD layer whether a phone is word-initial, medial or
+    # final, which it learned to weight differently. A single word is the
+    # default; a sentence passes the per-word positions in, so a word-final
+    # stop in the middle of a sentence is still scored as word-final.
     phone_scores = compute_phone_scores(
         phone_log_probs, spans, list(variant), phone_to_id, config.gop_floor,
         frame_weights=frame_weights,
         md_layer=load_md_layer() if config.use_md_layer else None,
-        positions=word_positions(len(variant)),
+        positions=list(positions) if positions is not None else word_positions(len(variant)),
     )
     return (
         word_score(phone_scores, config.duration_weighted_score),
@@ -268,6 +270,13 @@ def transcript_matches_target(transcript: str | None, target: str,
         return False
     if heard == target:
         return True
+    # A sentence item: the recogniser returns the whole carrier sentence, and
+    # the question is whether the target word is in it. Before this the
+    # transcript "He ate a banana for lunch." was compared whole against
+    # "banana", never matched, and the rescue that exists to stop false
+    # rejections never fired on a single sentence item.
+    if len(target.split()) == 1 and len(heard.split()) > 1:
+        return target in heard.split()
     # A single-word target heard as one word: compare pronunciations.
     if reference is not None and len(heard.split()) == 1:
         try:
@@ -406,8 +415,19 @@ def score_phone_sequence(
     reference: Reference | None = None,
     transcript: str | None = None,
     transcript_provider: TranscriptProvider | None = None,
+    context: tuple[Sequence[Sequence[str]], Sequence[Sequence[str]]] | None = None,
+    max_seconds: float | None = None,
 ) -> AttemptScore:
     """Score audio against an explicit set of accepted phone sequences.
+
+    ``context`` is the carrier words around a target inside a sentence, as
+    ``(leading_words, trailing_words)``, each a sequence of per-word phone
+    sequences. The whole sentence is aligned -- the carrier words anchor the
+    alignment, which is the point of having them -- but every judgement
+    (verdict, graded score, diagnosis, stress) is made over the target word's
+    phones alone. Without this, a sentence item was scored by aligning a
+    25-phone utterance against the 6 phones of its target word, and every
+    correctly read sentence came back "incorrect".
 
     The lexicon-free core of :func:`score_attempt`. Split out because
     benchmark corpora (Speechocean762 among them) ship their own canonical
@@ -436,9 +456,16 @@ def score_phone_sequence(
     if duration < config.min_audio_seconds:
         return _gated(target, "unscorable",
                       f"recording too short ({duration:.2f}s)", 0.0, timings, config)
-    if duration > config.max_audio_seconds:
+    ceiling = max_seconds if max_seconds is not None else config.max_audio_seconds
+    if duration > ceiling:
         return _gated(target, "unscorable",
                       f"recording too long ({duration:.2f}s)", 0.0, timings, config)
+
+    leading = tuple(tuple(w) for w in (context[0] if context else ()))
+    trailing = tuple(tuple(w) for w in (context[1] if context else ()))
+    lead_phones = tuple(p for w in leading for p in w)
+    trail_phones = tuple(p for w in trailing for p in w)
+    w0 = len(lead_phones)
 
     with timings.stage("acoustic"):
         emissions = model.emissions(waveform, sample_rate)
@@ -460,18 +487,30 @@ def score_phone_sequence(
     with timings.stage("forced_align"):
         best = None
         for variant in variants:
-            scored = _score_variant(emissions, variant, config,
+            full = lead_phones + tuple(variant) + trail_phones
+            positions = [pos for w in (*leading, tuple(variant), *trailing)
+                         for pos in word_positions(len(w))]
+            scored = _score_variant(emissions, full, config,
                                     phone_log_probs, phone_to_id,
-                                    frame_weights)
+                                    frame_weights, positions=positions)
             if scored is None:
                 continue
-            if best is None or scored[0] > best[0]:
-                best = (scored[0], scored[1], scored[2], variant, scored[3])
+            # Choose the target variant by how well the *target* fits, not by
+            # the whole sentence: the carrier words are the same for every
+            # variant and would only dilute the comparison.
+            w1 = w0 + len(variant)
+            focus_score = word_score(scored[1][w0:w1], config.duration_weighted_score)
+            if best is None or focus_score > best[0]:
+                best = (focus_score, scored[1], scored[2], full, scored[3], w1)
     if best is None:
         return _gated(target, "unscorable",
                       "no dictionary variant could be aligned to the audio",
                       confidence, timings, config)
-    utterance_score, phone_scores, spans, expected, folds = best
+    utterance_score, phone_scores_full, spans_full, expected_full, folds, w1 = best
+    # Everything judged from here on is judged over the target word only.
+    phone_scores = phone_scores_full[w0:w1]
+    spans = spans_full[w0:w1]
+    expected = expected_full[w0:w1]
 
     with timings.stage("decode"):
         observed = greedy_phone_decode(
@@ -479,8 +518,12 @@ def score_phone_sequence(
         )
 
     with timings.stage("align_phones"):
-        ops = align_phones([strip_stress(p) for p in expected], observed,
-                           gap_cost=config.gap_cost)
+        ops_full = align_phones([strip_stress(p) for p in expected_full], observed,
+                                gap_cost=config.gap_cost)
+        # Only the target's edits are diagnosed. Insertions carry no expected
+        # index and no acoustic evidence, and already cannot fail a word.
+        ops = [op for op in ops_full
+               if op.expected_index is not None and w0 <= op.expected_index < w1]
 
     with timings.stage("stress"):
         # BEEP variants carry no stress marks, so the expected stress pattern
@@ -563,4 +606,59 @@ def score_phone_sequence(
         transcript_matches=heard_target,
         timings=timings,
         provenance=config.provenance(),
+    )
+
+
+def score_sentence(
+    sentence: str,
+    target_word: str,
+    waveform: np.ndarray,
+    sample_rate: int,
+    model: AcousticModel,
+    config: PipelineConfig = DEFAULT_CONFIG,
+    transcript: str | None = None,
+    transcript_provider: TranscriptProvider | None = None,
+) -> AttemptScore:
+    """Score one word read inside a carrier sentence.
+
+    The whole sentence is aligned and only the target word is judged. The
+    carrier words are alignment context: they tell the aligner where in the
+    audio the target sits, which is far more reliable than trying to find a
+    six-phone word inside three seconds of speech with nothing to anchor it.
+
+    Carrier words take their primary pronunciation only. The target keeps every
+    accepted variant, because that is the word being assessed; giving every
+    carrier every variant would multiply the alignment count by the product of
+    their variant counts for no gain in what is measured.
+    """
+    timings = Timings()
+    words = normalize_text(sentence).split()
+    target = normalize_text(target_word)
+    if not words:
+        return _gated(target, "unscorable", "empty sentence", 0.0, timings, config)
+    if target not in words:
+        return _gated(target, "unscorable",
+                      f"target {target!r} is not in the sentence", 0.0, timings, config)
+    index = words.index(target)
+
+    try:
+        with timings.stage("lexicon"):
+            refs = [reference_for(w, accent=config.accent) for w in words]
+    except ResourceUnavailable as exc:
+        return _gated(target, "unscorable", str(exc), 0.0, timings, config)
+    missing = [w for w, r in zip(words, refs) if r is None]
+    if missing:
+        return _gated(target, "unscorable",
+                      f"no pronunciation known for {', '.join(missing)}",
+                      0.0, timings, config)
+
+    leading = [refs[i].primary for i in range(index)]
+    trailing = [refs[i].primary for i in range(index + 1, len(words))]
+    target_ref = refs[index]
+    return score_phone_sequence(
+        target, target_ref.variants, waveform, sample_rate, model, config,
+        timings, reference=target_ref, transcript=transcript,
+        transcript_provider=transcript_provider,
+        context=(leading, trailing),
+        max_seconds=config.max_sentence_seconds,
     )

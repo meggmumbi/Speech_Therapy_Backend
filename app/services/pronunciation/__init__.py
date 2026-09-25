@@ -25,7 +25,7 @@ from .feedback import (Condition, Feedback, arpabet_tokens_in, articulatory_cue,
 from .gop import PhoneScore, utterance_confidence
 from .lexicon import normalize_text, pronunciations
 from .prosody import StressAnalysis, analyse_stress
-from .scoring import (AttemptScore, PhoneDiagnosis, Timings, score_attempt,
+from .scoring import (AttemptScore, PhoneDiagnosis, Timings, score_attempt, score_sentence,
                       score_phone_sequence)
 
 __all__ = [
@@ -37,5 +37,5 @@ __all__ = [
     "Timings", "align_phones", "analyse_stress", "assert_phone_level",
     "ctc_forced_align", "differing_feature", "load_acoustic_model",
     "normalize_text", "phone_distance", "phone_error_rate", "pronunciations",
-    "score_attempt", "score_phone_sequence", "utterance_confidence",
+    "score_attempt", "score_sentence", "score_phone_sequence", "utterance_confidence",
 ]

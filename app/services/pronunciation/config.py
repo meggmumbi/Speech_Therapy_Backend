@@ -291,6 +291,11 @@ class PipelineConfig:
     # recording fault rather than an attempt.
     max_audio_seconds: float = 4.0
     min_audio_seconds: float = 0.2
+    # A carrier sentence takes three to five seconds to read at a natural
+    # pace, and "Turn right at the next corner" came back "unscorable: too
+    # long" under the single-word ceiling. Separate ceiling, not a raised
+    # shared one: a five-second recording of a single word is still a fault.
+    max_sentence_seconds: float = 10.0
 
     # Attempts allowed per item, gated attempts excluded. The backend owns
     # this because the feedback wording depends on it: on the last attempt the

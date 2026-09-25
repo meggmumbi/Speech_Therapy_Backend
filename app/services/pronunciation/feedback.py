@@ -333,6 +333,84 @@ def _remodel(word: str) -> str:
     return f"Listen again: {word}."
 
 
+def heard_instead(result: AttemptScore, word: str,
+                  sentence: str | None = None) -> str | None:
+    """The word the recogniser heard where ``word`` should have been, if any.
+
+    This is the difference between "focus on the a sound" and "I heard cup;
+    the word is cap", and the second is what a tutor says. It is built from
+    the ASR transcript, not from the phone alignment: identifying which phone
+    was substituted is right only 19% of the time on Speechocean762, but a
+    whole-word transcript is a different signal. On last week's recordings
+    the recogniser returned "tink" for think, "cup" for cap and "light" for
+    right -- the three transfer errors the study is about, by name.
+
+    Returns None unless the heard word is a real word, differs from the
+    target, and can be placed at the target's position. Nothing is said
+    otherwise; a wrong contrast is worse than a vague one.
+    """
+    if not result.transcript:
+        return None
+    from .lexicon import normalize_text
+    heard_words = normalize_text(result.transcript).split()
+    target = normalize_text(word)
+    if not heard_words or target in heard_words:
+        return None
+
+    if sentence is None:
+        candidates = heard_words if len(heard_words) == 1 else []
+    else:
+        # Line the heard sentence up with the expected one and take whatever
+        # sits where the target should. difflib finds the replaced block; a
+        # block of exactly one word is the only case worth naming.
+        import difflib
+        expected_words = normalize_text(sentence).split()
+        if target not in expected_words:
+            return None
+        t_index = expected_words.index(target)
+        matcher = difflib.SequenceMatcher(a=expected_words, b=heard_words)
+        candidates = []
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "replace" and i1 <= t_index < i2 and (i2 - i1) == (j2 - j1):
+                candidates = [heard_words[j1 + (t_index - i1)]]
+                break
+
+    for candidate in candidates:
+        if candidate != target and _is_near_miss(candidate, target):
+            return candidate
+    return None
+
+
+def _is_near_miss(heard: str, target: str) -> bool:
+    """Is ``heard`` a word a person could plausibly have said for ``target``?
+
+    A dictionary word always qualifies. So does a form whose pronunciation is
+    one phone away from the target: "tink" is not in CMUdict, but it is exactly
+    what a /th/ -> /t/ substitution sounds like, and it is the word the
+    recogniser wrote down. One phone, not two: a single substitution is what a
+    transfer error is, and g2p will happily put a made-up string like "bnnna"
+    within two edits of "banana". Telling someone "I heard bnnna" is worse
+    than saying nothing.
+    """
+    from .align import align_phones
+    from .lexicon import in_cmudict, pronunciations
+    if not heard.isalpha() or len(heard) < 2:
+        return False
+    if in_cmudict(heard):
+        return True
+    try:
+        heard_forms = pronunciations(heard)
+        target_forms = pronunciations(target)
+    except Exception:  # noqa: BLE001 - lexicon trouble must not fail feedback
+        return False
+    if not heard_forms or not target_forms:
+        return False
+    h = [strip_stress(x) for x in heard_forms[0]]
+    t = [strip_stress(x) for x in target_forms[0]]
+    edits = sum(1 for op in align_phones(t, h) if op.kind != "match")
+    return edits <= 1
+
+
 def assessment_acknowledgement(attempt_index: int = 0) -> Feedback:
     """The robot's turn in an assessment session: content-free by construction.
 
@@ -373,22 +451,32 @@ PERCEPTION_INCORRECT: tuple[str, ...] = (
 )
 
 
-def perception_feedback(is_correct: bool, attempt_index: int = 0) -> Feedback:
+def perception_feedback(is_correct: bool, attempt_index: int = 0,
+                        condition: Condition | None = None,
+                        reveal: str | None = None) -> Feedback:
     """What the robot says about a tapped answer in a training block.
 
-    Says whether it was right and nothing more. No re-model, no named phone:
-    there is no production to diagnose, and a correction phrased as though
-    there were would be feedback about something the participant did not do.
+    Right or wrong in both conditions. In D, a wrong answer is followed by the
+    answer: "The word you heard was ship", "The strongest syllable is the
+    second one". That is the tutoring move for a perception item -- there is
+    no production to diagnose, so what the diagnostic condition can add is
+    *which* one was right. K says only that it was not that one, which is the
+    knowledge-of-result manipulation carried over to tapping.
+
+    Tapped items therefore carry the condition from here on. They did not
+    before, when both conditions said the same thing.
     """
     bank = PERCEPTION_CORRECT if is_correct else PERCEPTION_INCORRECT
     speech = bank[attempt_index % len(bank)]
+    if not is_correct and condition == "D" and reveal:
+        speech = f"{WARMTH_MARKERS[attempt_index % len(WARMTH_MARKERS)]} {reveal}"
     return Feedback(
         speech=speech,
         display=speech,
         kind="perception",
-        condition=None,
+        condition=condition,
         named_phone=None,
-        cue_used=None,
+        cue_used=reveal if (not is_correct and condition == "D") else None,
         remodel=False,
     )
 
@@ -401,8 +489,12 @@ def generate_feedback(
     use_contrast_cue: bool = False,
     match_length: bool = True,
     retry_available: bool = True,
+    sentence: str | None = None,
 ) -> Feedback:
     """Render one turn of robot speech for a scored attempt.
+
+    ``sentence`` is the carrier sentence for a read-aloud item, used only to
+    place the target in the recogniser's transcript; see :func:`heard_instead`.
 
     ``attempt_index`` drives warmth-marker and filler rotation and must be the
     same counter in both conditions, so that K and D differ only in diagnostic
@@ -448,13 +540,25 @@ def generate_feedback(
         return Feedback(speech, speech, "stress", condition, None, None,
                         remodel=True)
 
+    # What the participant actually produced, as a word. The single most
+    # useful thing a tutor can say, and until now D never said it: the
+    # supervisor's verdict on the pilot was that she could not tell K from D.
+    heard = heard_instead(result, word, sentence)
+    contrast = f"I heard {heard}. The word is {word}." if heard else None
+
     diagnosis = primary_diagnosis(result)
     if diagnosis is None:
-        # Scored wrong, but no phone is nameable with enough confidence. D
-        # falls back to K's utterance rather than inventing a diagnosis --
-        # including K's filler. Without the filler this fallback ran ~5 words
-        # against K's ~16, inverting the very length imbalance the filler
-        # exists to remove.
+        if contrast:
+            # No phone is nameable, but the recogniser heard a different real
+            # word. That is a diagnosis in itself -- a better one than a
+            # phone, for a learner -- so D says it and skips K's filler.
+            speech = " ".join((marker, contrast, remodel))
+            return Feedback(speech, speech, "correction", condition, None,
+                            contrast, remodel=True)
+        # Scored wrong, nothing nameable, nothing heard: D falls back to K's
+        # utterance rather than inventing a diagnosis -- including K's filler.
+        # Without the filler this fallback ran ~5 words against K's ~16,
+        # inverting the very length imbalance the filler exists to remove.
         filler = K_FILLERS[attempt_index % len(K_FILLERS)] if match_length else None
         speech = " ".join(p for p in (marker, filler, remodel) if p)
         return Feedback(speech, speech, "correction", condition, None, None,
@@ -463,7 +567,12 @@ def generate_feedback(
     cue = (contrast_cue(diagnosis.expected, diagnosis.observed)
            if use_contrast_cue else None) or articulatory_cue(diagnosis.expected)
     named = speakable_phone(diagnosis.expected, avoid=word)
-    parts = [marker, f"Focus on {named}."]
+    # Order is the tutoring move: what you did, what it should be, how to make
+    # it, then the model. Each sentence is short enough to hold while trying.
+    parts = [marker]
+    if contrast:
+        parts.append(contrast)
+    parts.append(f"The sound to fix is {named}.")
     if cue:
         parts.append(cue)
     parts.append(remodel)
