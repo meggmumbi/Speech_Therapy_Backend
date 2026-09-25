@@ -833,6 +833,14 @@ def balance(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/dashboard")
+def dashboard(target: int | None = None, db: Session = Depends(get_db)):
+    """One pass over the tables the console's dashboard reads. See
+    services/dashboard.py for what each number means and why."""
+    from ..services import dashboard as dash
+    return dash.build(db, recruitment_target=target)
+
+
 @router.get("/design")
 def design(db: Session = Depends(get_db)):
     """The design itself, so the experimenter can check what will be run."""

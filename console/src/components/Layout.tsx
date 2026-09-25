@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Box, Button, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Typography,
 } from "@mui/material";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import LibraryBooksOutlinedIcon from "@mui/icons-material/LibraryBooksOutlined";
 import BalanceOutlinedIcon from "@mui/icons-material/BalanceOutlined";
@@ -11,6 +12,7 @@ import { useAuth } from "../auth/AuthContext";
 const WIDTH = 240;
 
 const NAV = [
+  { to: "/dashboard", label: "Dashboard", icon: <DashboardOutlinedIcon /> },
   { to: "/participants", label: "Participants", icon: <PeopleOutlineIcon /> },
   { to: "/stimuli", label: "Stimulus sets", icon: <LibraryBooksOutlinedIcon /> },
   { to: "/balance", label: "Balance", icon: <BalanceOutlinedIcon /> },

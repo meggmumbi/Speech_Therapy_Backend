@@ -1,0 +1,58 @@
+/*
+ * Chart roles. Hex values come from the validated reference palette; the
+ * chart code refers to roles only. This console has no dark mode, so only
+ * the light steps are defined -- add the dark block if one is introduced.
+ *
+ * Validated on the white paper surface with scripts/validate_palette.js:
+ *   categorical K/D pair  #2a78d6,#eb6834            adjacent gates pass
+ *   ordinal funnel ramp   #86b6ef ... #104281        --ordinal passes
+ * Status steps are fixed and ship with a label, never colour alone.
+ */
+.viz-root {
+  color-scheme: light;
+  --surface-1: #ffffff;
+  --text-primary: #0f1a22;
+  --text-secondary: #4b5e6b;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+
+  --series-1: #2a78d6;   /* K, and any single nominal series */
+  --series-2: #eb6834;   /* D */
+
+  --ord-1: #86b6ef;      /* funnel, pre-test .. delayed */
+  --ord-2: #5598e7;
+  --ord-3: #2a78d6;
+  --ord-4: #1c5cab;
+  --ord-5: #104281;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+.viz-grid { stroke: var(--grid); stroke-width: 1; }
+.viz-baseline { stroke: var(--baseline); stroke-width: 1; }
+.viz-tick { font: 11px system-ui, sans-serif; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+.viz-cat { font: 12px system-ui, sans-serif; fill: var(--text-secondary); }
+.viz-value { font: 600 11px system-ui, sans-serif; fill: var(--text-primary); }
+
+.viz-legend { display: flex; gap: 14px; flex-wrap: wrap; font: 12px system-ui, sans-serif; color: var(--text-secondary); }
+.viz-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.viz-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+.viz-tip {
+  position: absolute; transform: translate(-50%, calc(-100% - 8px));
+  background: var(--text-primary); color: #fff; padding: 6px 10px; border-radius: 8px;
+  font: 12px system-ui, sans-serif; white-space: nowrap; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(15,26,34,.18);
+}
+.viz-tip strong { font-size: 13px; }
+.viz-tip-key { display: inline-block; width: 10px; height: 3px; border-radius: 2px; }
+
+.viz-toggle {
+  font: 600 12px system-ui, sans-serif; color: var(--text-secondary); background: none;
+  border: 0; cursor: pointer; padding: 4px 6px; border-radius: 6px;
+}
+.viz-toggle:hover { background: #f1f6fa; }

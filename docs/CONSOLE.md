@@ -58,9 +58,7 @@ Nearly everything is already there. Missing:
 - `PUT /authoring/items/{id}` to edit one item in place. Done, with
   `GET /authoring/categories`, `GET /authoring/categories/{id}/items`,
   `POST` to create one item, and `DELETE`.
-- A dashboard aggregate endpoint, or the console composes it from
-  `/study/balance`, `/measures/participants/{id}/questionnaires` and the
-  session summaries.
+- A dashboard aggregate endpoint. Done: `GET /study/dashboard?target=N`.
 - CORS for the console's origin.
 
 ## Stack
@@ -95,6 +93,16 @@ before upload so the server stores exactly the format the tablet plays.
    version is the same file at a different rate. With a recording present the
    robot no longer says the word itself; two models is the inconsistency the
    recording exists to remove.
-4. Dashboard. One day.
+4. Dashboard. **Done 2026-09-25.** The console's landing page. One hero
+   figure (participants through the full protocol, against a target the
+   researcher sets), stat tiles, and five charts whose forms follow the
+   data's job: counterbalancing cells and the protocol funnel are magnitude,
+   accuracy and questionnaire means are K against D, recording quality per
+   session day is state. Every chart has a table view and a hover readout, the
+   categorical pair and the ordinal ramp were validated for colour-vision
+   safety on the console's surface, and every number is computed by
+   `app/services/dashboard.py` with the same definitions the summaries use:
+   final attempts, gated and skipped excluded, training only. The
+   false-correction tile exists and says "not yet"; Phase 6 supplies it.
 
 Each step ships on its own and is useful on its own.
