@@ -61,7 +61,8 @@ export function Rate({ role }: { role: "researcher" | "rater" }) {
     onError: (e) => setError((e as Error).message),
   });
 
-  const canSubmit = clip && correct !== null && (task === "pilot_label" || accuracy !== null || correct);
+  const binary = task !== "study_rating";
+  const canSubmit = clip && correct !== null && (binary || accuracy !== null || correct);
   const play = useCallback(() => { const a = audioRef.current; if (a) { a.currentTime = 0; a.play().catch(() => undefined); } }, []);
 
   // Keyboard: space plays, 1/0 or y/n decide, 1-5 rate accuracy after a "no", enter submits, u = unusable.
@@ -69,15 +70,15 @@ export function Rate({ role }: { role: "researcher" | "rater" }) {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
       if (e.code === "Space") { e.preventDefault(); play(); return; }
-      if (e.key === "y" || (task === "pilot_label" && e.key === "1")) { setCorrect(true); return; }
-      if (e.key === "n" || (task === "pilot_label" && e.key === "0")) { setCorrect(false); return; }
+      if (e.key === "y" || (binary && e.key === "1")) { setCorrect(true); return; }
+      if (e.key === "n" || (binary && e.key === "0")) { setCorrect(false); return; }
       if (task === "study_rating" && /^[1-5]$/.test(e.key)) { setAccuracy(Number(e.key)); return; }
       if (e.key === "u") { if (clip) submit.mutate(true); return; }
       if (e.key === "Enter" && canSubmit && !submit.isPending) submit.mutate(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [task, clip, canSubmit, play, submit]);
+  }, [task, binary, clip, canSubmit, play, submit]);
 
   const total = progress.data?.total ?? 0;
   const rated = progress.data?.rated ?? 0;
@@ -91,6 +92,7 @@ export function Rate({ role }: { role: "researcher" | "rater" }) {
           <ToggleButtonGroup exclusive size="small" value={task} onChange={(_, v) => { if (v) { setTask(v); setIndex(0); reset(); } }}>
             <ToggleButton value="pilot_label">Pilot labels</ToggleButton>
             <ToggleButton value="study_rating">Study ratings</ToggleButton>
+            <ToggleButton value="review">Review</ToggleButton>
           </ToggleButtonGroup>
         ) : undefined}
       />
@@ -150,7 +152,7 @@ export function Rate({ role }: { role: "researcher" | "rater" }) {
                 <Button variant="contained" size="large" disabled={!canSubmit || submit.isPending} onClick={() => submit.mutate(false)}>Next (Enter)</Button>
                 <Button color="inherit" disabled={submit.isPending} onClick={() => submit.mutate(true)}>Recording unusable (u)</Button>
               </Stack>
-              <Typography variant="caption" color="text.secondary">Space plays. {task === "pilot_label" ? "1 = correct, 0 = not." : "y / n, then 1–5."}</Typography>
+              <Typography variant="caption" color="text.secondary">Space plays. {binary ? "1 = correct, 0 = not." : "y / n, then 1–5."}</Typography>
             </Stack>
           </Paper>
         )}

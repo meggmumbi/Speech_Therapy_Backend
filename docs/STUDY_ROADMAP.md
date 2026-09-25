@@ -393,6 +393,31 @@ perception-item audio needs somewhere to be recorded.
   computed, not described: percent agreement and Cohen's kappa per pair,
   Fleiss' kappa across all raters, within-rater agreement on the repeats, and
   a disagreement list for adjudication.
+- Pipeline audit. **Done 2026-09-25.** A third rating task, `review`, for
+  the researcher alone: every stored attempt whose verdict rested on the
+  least evidence, tagged with why -- `rescued` (the acoustics said wrong and
+  the ASR transcript overrode them; the scorer's only route to a false
+  acceptance), `heard_but_rejected` (the transcript held the target and the
+  verdict was still wrong; the route to a false rejection), `close`, and
+  `borderline`. Judged blind on the same screen; `GET /ratings/audit` then
+  puts the labels beside the verdicts and reports the false-rejection rate
+  (of what a person called right, how much the robot contradicted) and the
+  false-acceptance rate (of what a person called wrong, how much got
+  through), overall and per reason. The audit of 2026-09-25 that prompted
+  it: of 148 stored attempts since 09-17, 18 verdicts were transcript
+  rescues with acoustic scores 0.34-0.57, and in 4 of the 7 most recent the
+  phone the rescue overrode was the item's own target-feature phone
+  ("three" TH=0.21, "pull" UH=0.41). Whisper normalises exactly the
+  contrasts the study measures, so a rescue there is not evidence the
+  contrast was produced. No threshold was moved: that waits for the audit
+  to say so on more than a handful of clips.
+- Stored verdicts re-scored. `scripts/rescore_sessions.py` now scores
+  read-aloud items as the server does (`--apply` writes back, backing the
+  touched columns up to a JSON file that `--restore` reads). Every
+  read-aloud attempt stored before 09-25 had been scored against the target
+  word alone; the dry run over 148 attempts since 09-17 flips 44 verdicts to
+  correct and none to wrong. Until `--apply` is run the summaries and the
+  dashboard read those 44 as errors the participant did not make.
 - Two or three trained raters, ICC / Fleiss kappa reported, adjudication path.
 - Analysis in linear mixed-effects models with participant, item and rater as
   random effects, effect sizes against Plonsky & Oswald benchmarks. This is the

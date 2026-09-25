@@ -87,3 +87,45 @@ def describe_kappa(k: float | None) -> str:
     if k < 0.81:
         return "substantial"
     return "almost perfect"
+
+
+# --- people against the pipeline --------------------------------------------
+
+def confusion(human: Sequence[bool | None], pipeline: Sequence[bool | None]) -> dict:
+    """Count where the pipeline's verdict and a human's judgement part ways.
+
+    `human` is the label a person gave (True = said correctly), `pipeline`
+    the verdict the scorer wrote at the time (True = correct). Pairs with a
+    None on either side are left out.
+
+    The two off-diagonal cells are the two failures the study cares about,
+    and they are not symmetric. A false rejection tells a volunteer they got
+    wrong something they said right; a false acceptance lets a real error
+    through unremarked. The first is the worse one, so it is reported first
+    and as a rate over the clips the person called correct: "of the things
+    said right, how many did the robot contradict?" The false-acceptance
+    rate is over the clips the person called wrong, for the same reason.
+    """
+    tp = fn = fp = tn = 0
+    for h, p in zip(human, pipeline):
+        if h is None or p is None:
+            continue
+        if h and p:
+            tp += 1
+        elif h and not p:
+            fn += 1
+        elif not h and p:
+            fp += 1
+        else:
+            tn += 1
+    n = tp + fn + fp + tn
+    return {
+        "clips": n,
+        "both_correct": tp,
+        "both_wrong": tn,
+        "false_rejections": fn,   # human said right, pipeline said wrong
+        "false_acceptances": fp,  # human said wrong, pipeline said right
+        "false_rejection_rate": round(100.0 * fn / (tp + fn), 1) if (tp + fn) else None,
+        "false_acceptance_rate": round(100.0 * fp / (fp + tn), 1) if (fp + tn) else None,
+        "accuracy": round(100.0 * (tp + tn) / n, 1) if n else None,
+    }

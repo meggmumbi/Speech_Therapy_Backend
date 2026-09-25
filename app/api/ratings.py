@@ -1,10 +1,15 @@
 """Listening and judging: the pilot labels, and the study's human ratings.
 
-One screen, two tasks. `pilot_label` is one person, binary, over the 78 pilot
-recordings, and it exists to refit the verdict threshold on labels the
+One screen, three tasks. `pilot_label` is one person, binary, over the 78
+pilot recordings, and it exists to refit the verdict threshold on labels the
 pipeline did not influence. `study_rating` is several raters, a richer scale,
 over a stratified sample of the study's recordings, and it is where the
-false-correction rate and the inter-rater statistics come from.
+false-correction rate and the inter-rater statistics come from. `review` is
+the researcher alone, over the attempts the pipeline was least sure about:
+the ones the ASR transcript rescued, the ones it called close, and the ones
+it rejected although the transcript contained the target. Its report
+(`/audit`) counts the two failures that matter, false rejections and false
+acceptances, so a threshold is moved on evidence rather than on one clip.
 
 BLIND BY CONSTRUCTION
 
@@ -41,7 +46,8 @@ router = APIRouter(tags=["ratings"])
 
 PILOT = "pilot_label"
 STUDY = "study_rating"
-TASKS = (PILOT, STUDY)
+REVIEW = "review"
+TASKS = (PILOT, STUDY, REVIEW)
 PILOT_CSV = Path("benchmarks/pilot_to_label.csv")
 
 
@@ -56,9 +62,15 @@ class SampleRequest(BaseModel):
     seed: int = 2026
 
 
-def _task(value: str) -> str:
+def _task(value: str, user: models.Caregiver | None = None) -> str:
     if value not in TASKS:
         raise HTTPException(400, f"task must be one of {', '.join(TASKS)}")
+    # The review set is chosen by the pipeline's own uncertainty, and its
+    # report puts verdicts beside labels. It is the researcher's tool, not a
+    # rater's: an external rater must never be handed a set defined by what
+    # the model thought.
+    if value == REVIEW and user is not None and (user.role or "researcher") == "rater":
+        raise HTTPException(403, "the review task is for researchers")
     return value
 
 
@@ -71,7 +83,10 @@ def build_sample(request: SampleRequest, db: Session = Depends(get_db)):
     and no agreement statistic survives that.
     """
     task = _task(request.task)
-    if db.query(models.Rating).filter(models.Rating.task == task).first():
+    # The review set may be rebuilt at any time: it is one person's audit,
+    # not an agreement study, and a judgement already made keeps its attempt
+    # id whether or not that attempt is still in the queue.
+    if task != REVIEW and db.query(models.Rating).filter(models.Rating.task == task).first():
         raise HTTPException(409, f"{task} already has ratings; the set cannot be rebuilt under them")
 
     rng = random.Random(request.seed)
@@ -90,6 +105,13 @@ def build_sample(request: SampleRequest, db: Session = Depends(get_db)):
             if p in by_path:
                 chosen.append((by_path[p].id, "pilot"))
         note = f"{len(missing)} CSV rows have no stored attempt" if missing else None
+    elif task == REVIEW:
+        candidates = _review_candidates(db)
+        reasons: dict[str, int] = defaultdict(int)
+        for a, reason in candidates:
+            chosen.append((a.id, reason))
+            reasons[reason] += 1
+        note = ", ".join(f"{n} {r}" for r, n in sorted(reasons.items())) or None
     else:
         candidates = _study_candidates(db)
         by_stratum: dict[str, list[models.SessionActivity]] = defaultdict(list)
@@ -142,6 +164,55 @@ def _study_candidates(db: Session) -> list[tuple[models.SessionActivity, str]]:
     return out
 
 
+def _review_candidates(db: Session) -> list[tuple[models.SessionActivity, str]]:
+    """The attempts whose verdict rested on the least evidence, each tagged
+    with why it is here. Everything spoken and stored, the researcher's own
+    test sessions included, because those are where the model is exercised
+    between participants.
+
+    rescued: the acoustics said wrong, the transcript said the target was
+        heard, and the rescue rule made it correct. This is the only path to
+        a false acceptance the scorer has, so every one of them is listed.
+    heard_but_rejected: the transcript contained the target and the verdict
+        was still incorrect or close. Either the transcript was generous or
+        the verdict was a false rejection, and only an ear can say which.
+    close: the verdict itself says the evidence was marginal.
+    borderline: correct on the acoustics alone but within 0.05 of the line.
+    """
+    from ..services.pronunciation.runtime import get_config
+    from ..services.pronunciation.scoring import normalize_text, transcript_matches_target
+    t = get_config().thresholds
+    rows = (db.query(models.SessionActivity, models.ActivityItem)
+            .join(models.ActivityItem, models.SessionActivity.item_id == models.ActivityItem.id)
+            .filter(models.SessionActivity.audio_ref.isnot(None),
+                    models.SessionActivity.verdict.isnot(None))
+            .all())
+    out = []
+    for a, item in rows:
+        if a.skipped or a.gated or a.verdict in ("gated", "unscorable"):
+            continue
+        if not exercises.needs_asr(a.exercise_type or item.effective_type):
+            continue
+        if not os.path.exists(a.audio_ref):
+            continue
+        spec = item.spec or {}
+        target = str(spec.get("target_word") or spec.get("word") or item.name)
+        score = a.verdict_score if a.verdict_score is not None else 0.0
+        heard = bool(a.transcript_matches) or bool(transcript_matches_target(a.transcript, normalize_text(target), None))
+        if a.verdict == "correct" and heard and score < t.correct:
+            reason = "rescued"
+        elif a.verdict in ("incorrect", "close", "stress_error") and heard:
+            reason = "heard_but_rejected"
+        elif a.verdict == "close":
+            reason = "close"
+        elif a.verdict == "correct" and score < t.correct + 0.05:
+            reason = "borderline"
+        else:
+            continue
+        out.append((a, reason))
+    return out
+
+
 # --- the queue --------------------------------------------------------------
 
 def _rater_order(rater_id: uuid.UUID, task: str, key: str) -> int:
@@ -160,7 +231,7 @@ def queue(task: str, limit: int = 20, db: Session = Depends(get_db),
     rater may name as wrong, and where to fetch the audio. What is not sent
     is the point of the endpoint.
     """
-    task = _task(task)
+    task = _task(task, user)
     done = {(r.attempt_id, r.repeat_index) for r in
             db.query(models.Rating).filter(models.Rating.task == task,
                                            models.Rating.rater_id == user.id)}
@@ -203,7 +274,7 @@ def queue(task: str, limit: int = 20, db: Session = Depends(get_db),
 @router.get("/progress")
 def progress(task: str, db: Session = Depends(get_db),
              user: models.Caregiver = Depends(get_current_user)):
-    task = _task(task)
+    task = _task(task, user)
     total = db.query(models.RatingSet).filter(models.RatingSet.task == task).count()
     mine = db.query(models.Rating).filter(models.Rating.task == task,
                                           models.Rating.rater_id == user.id).count()
@@ -226,7 +297,7 @@ class RatingSubmission(BaseModel):
 @router.post("/")
 def submit(body: RatingSubmission, db: Session = Depends(get_db),
            user: models.Caregiver = Depends(get_current_user)):
-    task = _task(body.task)
+    task = _task(body.task, user)
     in_set = (db.query(models.RatingSet)
               .filter(models.RatingSet.task == task,
                       models.RatingSet.attempt_id == body.attempt_id,
@@ -356,6 +427,55 @@ def agreement_report(task: str, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/audit", dependencies=[Depends(require_researcher)])
+def audit(task: str, db: Session = Depends(get_db)):
+    """The pipeline against the people, on whichever task has been rated.
+
+    One row per rated attempt: what the majority of raters said, what the
+    pipeline wrote at the time, and why the clip was in the set. The totals
+    are the two failure rates. A verdict is shown here only after a label
+    exists for it, so the label was made blind.
+    """
+    task = _task(task)
+    ratings = db.query(models.Rating).filter(models.Rating.task == task).all()
+    votes: dict[uuid.UUID, list[bool]] = defaultdict(list)
+    for r in ratings:
+        if r.repeat_index == 0 and not r.unusable and r.correct is not None:
+            votes[r.attempt_id].append(r.correct)
+    if not votes:
+        return {"task": task, "totals": agreement.confusion([], []), "by_reason": {}, "rows": []}
+    reason_of = {e.attempt_id: e.stratum for e in
+                 db.query(models.RatingSet).filter(models.RatingSet.task == task, models.RatingSet.repeat_index == 0)}
+    attempts = (db.query(models.SessionActivity, models.ActivityItem)
+                .join(models.ActivityItem, models.SessionActivity.item_id == models.ActivityItem.id)
+                .filter(models.SessionActivity.id.in_(list(votes))).all())
+    rows, humans, pipes = [], [], []
+    by_reason: dict[str, tuple[list, list]] = defaultdict(lambda: ([], []))
+    for a, item in sorted(attempts, key=lambda t: t[0].created_at or datetime.min):
+        v = votes[a.id]
+        human = sum(v) * 2 >= len(v)
+        pipeline = None if a.verdict in (None, "gated", "unscorable") else a.verdict == "correct"
+        reason = reason_of.get(a.id, "-")
+        humans.append(human); pipes.append(pipeline)
+        by_reason[reason][0].append(human); by_reason[reason][1].append(pipeline)
+        spec = item.spec or {}
+        rows.append({
+            "attempt_id": str(a.id), "target": str(spec.get("target_word") or spec.get("word") or item.name),
+            "sentence": spec.get("sentence"), "exercise_type": a.exercise_type or item.effective_type,
+            "target_feature": item.target_feature, "reason": reason,
+            "human_correct": human, "votes": len(v),
+            "pipeline_verdict": a.verdict, "pipeline_score": a.verdict_score, "transcript": a.transcript,
+            "disagree": pipeline is not None and human != pipeline,
+            "recorded_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return {
+        "task": task,
+        "totals": agreement.confusion(humans, pipes),
+        "by_reason": {r: agreement.confusion(h, p) for r, (h, p) in sorted(by_reason.items())},
+        "rows": rows,
+    }
+
+
 @router.get("/export", dependencies=[Depends(require_researcher)])
 def export(task: str, db: Session = Depends(get_db)):
     """pilot_label: write human_label back into the CSV the refit script
@@ -439,5 +559,6 @@ def list_raters(db: Session = Depends(get_db)):
     counts = defaultdict(int)
     for r in db.query(models.Rating).all():
         counts[(r.rater_id, r.task)] += 1
-    return [{"username": r.username, "pilot_label": counts[(r.id, PILOT)], "study_rating": counts[(r.id, STUDY)]}
+    return [{"username": r.username, "pilot_label": counts[(r.id, PILOT)], "study_rating": counts[(r.id, STUDY)],
+             "review": counts[(r.id, REVIEW)]}
             for r in raters]

@@ -112,3 +112,11 @@ Each step ships on its own and is useful on its own.
    nothing else; a researcher page for building the stratified sample,
    creating raters, reading the agreement statistics, adjudicating
    disagreements and exporting. Phase 6's first item.
+
+   A third task, **Review the pipeline**, was added the same day: the
+   researcher's own audit of the attempts the scorer was least sure about
+   (transcript rescues, rejections despite the transcript holding the
+   target, close calls, near-the-line corrects), judged blind, then read
+   back on the Rating page as a false-rejection rate and a false-acceptance
+   rate with the disagreements listed. Raters cannot see this task: its set
+   is defined by what the model thought.

@@ -4,6 +4,16 @@ import {
   Alert, Box, Button, Chip, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import { ratings, type Task } from "../api/ratings";
+
+const REASONS: Record<string, string> = {
+  rescued: "Transcript rescued it",
+  heard_but_rejected: "Heard, yet rejected",
+  close: "Called close",
+  borderline: "Correct, near the line",
+  pilot: "Pilot recording",
+};
+const reasonLabel = (r: string) => REASONS[r] ?? r;
+const rate = (v: number | null) => (v === null ? "—" : `${v}%`);
 import { PageHeader, Section, StatCard } from "../components/ui";
 
 /**
@@ -20,9 +30,10 @@ export function Ratings() {
   const [error, setError] = useState<string | null>(null);
 
   const agreement = useQuery({ queryKey: ["agreement", task], queryFn: () => ratings.agreement(task) });
+  const audit = useQuery({ queryKey: ["audit", task], queryFn: () => ratings.audit(task) });
   const raters = useQuery({ queryKey: ["raters"], queryFn: ratings.raters });
   const fail = (e: unknown) => setError((e as Error).message);
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ["agreement"] }); qc.invalidateQueries({ queryKey: ["raters"] }); qc.invalidateQueries({ queryKey: ["queue"] }); qc.invalidateQueries({ queryKey: ["rating-progress"] }); };
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["agreement"] }); qc.invalidateQueries({ queryKey: ["audit"] }); qc.invalidateQueries({ queryKey: ["raters"] }); qc.invalidateQueries({ queryKey: ["queue"] }); qc.invalidateQueries({ queryKey: ["rating-progress"] }); };
 
   const sample = useMutation({
     mutationFn: () => ratings.sample(task, Number(perStratum) || 4, Number(repeat) || 0.1),
@@ -52,11 +63,16 @@ export function Ratings() {
               <Stack direction="row" spacing={1}>
                 <Chip label="Study ratings" clickable color={task === "study_rating" ? "primary" : "default"} onClick={() => setTask("study_rating")} />
                 <Chip label="Pilot labels" clickable color={task === "pilot_label" ? "primary" : "default"} onClick={() => setTask("pilot_label")} />
+                <Chip label="Review the pipeline" clickable color={task === "review" ? "primary" : "default"} onClick={() => setTask("review")} />
               </Stack>
-              {task === "study_rating" ? (
+              {task === "study_rating" && (
                 <Typography variant="body2" color="text.secondary">Spoken items from stamped sessions with a clean recording, from participants who consented to retention, stratified by session type, condition and target feature.</Typography>
-              ) : (
+              )}
+              {task === "pilot_label" && (
                 <Typography variant="body2" color="text.secondary">The 78 pilot recordings, for refitting the verdict threshold on labels the pipeline did not influence.</Typography>
+              )}
+              {task === "review" && (
+                <Typography variant="body2" color="text.secondary">Every stored attempt the pipeline was least sure about: verdicts the transcript rescued, attempts rejected although the transcript held the target, close calls, and correct verdicts near the line. For you alone, rebuildable any time. Judge them blind on the Rate screen, then read the audit below.</Typography>
               )}
               <Stack direction="row" spacing={1}>
                 {task === "study_rating" && <TextField label="Clips per stratum" type="number" value={perStratum} onChange={(e) => setPerStratum(e.target.value)} sx={{ width: 150 }} />}
@@ -74,6 +90,7 @@ export function Ratings() {
                   <Typography fontWeight={600}>{r.username}</Typography>
                   <Chip size="small" label={`${r.study_rating} study`} />
                   <Chip size="small" label={`${r.pilot_label} pilot`} />
+                  {r.review > 0 && <Chip size="small" label={`${r.review} review`} />}
                 </Stack>
               ))}
               {raters.data?.length === 0 && <Typography color="text.secondary" variant="body2">No rater accounts yet. Two or three are needed for the reliability statistics.</Typography>}
@@ -142,6 +159,54 @@ export function Ratings() {
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>The pipeline's verdict is shown here, after the fact, only so you can see where people and model part ways. Raters never see it.</Typography>
             </Section>
           </>
+        )}
+
+        {audit.data && audit.data.totals.clips > 0 && (
+          <Section title="The pipeline against your ears">
+            <Stack spacing={2}>
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 2 }}>
+                <StatCard value={audit.data.totals.clips} label="Clips judged" />
+                <StatCard value={rate(audit.data.totals.false_rejection_rate)} label={`False rejections · ${audit.data.totals.false_rejections} of ${audit.data.totals.both_correct + audit.data.totals.false_rejections} said right`} />
+                <StatCard value={rate(audit.data.totals.false_acceptance_rate)} label={`False acceptances · ${audit.data.totals.false_acceptances} of ${audit.data.totals.both_wrong + audit.data.totals.false_acceptances} said wrong`} />
+                <StatCard value={rate(audit.data.totals.accuracy)} label="Agreement with you" />
+              </Box>
+              {Object.keys(audit.data.by_reason).length > 1 && (
+                <Table size="small">
+                  <TableHead><TableRow><TableCell>Why it was in the set</TableCell><TableCell align="right">Clips</TableCell><TableCell align="right">False rejections</TableCell><TableCell align="right">False acceptances</TableCell><TableCell align="right">Agreement</TableCell></TableRow></TableHead>
+                  <TableBody>
+                    {Object.entries(audit.data.by_reason).map(([reason, c]) => (
+                      <TableRow key={reason}>
+                        <TableCell>{reasonLabel(reason)}</TableCell>
+                        <TableCell align="right">{c.clips}</TableCell>
+                        <TableCell align="right">{c.false_rejections}</TableCell>
+                        <TableCell align="right">{c.false_acceptances}</TableCell>
+                        <TableCell align="right">{rate(c.accuracy)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              <Typography variant="subtitle2">Where you and the pipeline disagree ({audit.data.rows.filter((r) => r.disagree).length})</Typography>
+              {audit.data.rows.some((r) => r.disagree) ? (
+                <Table size="small">
+                  <TableHead><TableRow><TableCell>Target</TableCell><TableCell>You said</TableCell><TableCell>Pipeline said</TableCell><TableCell align="right">Score</TableCell><TableCell>Transcript</TableCell><TableCell>Reason</TableCell></TableRow></TableHead>
+                  <TableBody>
+                    {audit.data.rows.filter((r) => r.disagree).map((r) => (
+                      <TableRow key={r.attempt_id}>
+                        <TableCell><strong>{r.target}</strong>{r.sentence && <Typography variant="caption" display="block" color="text.secondary">{r.sentence}</Typography>}</TableCell>
+                        <TableCell><Chip size="small" variant="outlined" color={r.human_correct ? "success" : "error"} label={r.human_correct ? "correct" : "wrong"} /></TableCell>
+                        <TableCell><Chip size="small" variant="outlined" color={r.pipeline_verdict === "correct" ? "success" : "error"} label={r.pipeline_verdict === "correct" ? "correct · false acceptance" : `${r.pipeline_verdict} · false rejection`} /></TableCell>
+                        <TableCell align="right">{r.pipeline_score?.toFixed(2) ?? "—"}</TableCell>
+                        <TableCell><Typography variant="body2" color="text.secondary">{r.transcript ?? "—"}</Typography></TableCell>
+                        <TableCell><Typography variant="body2" color="text.secondary">{reasonLabel(r.reason)}</Typography></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : <Typography color="text.secondary" variant="body2">None. Every clip judged so far, the pipeline judged the same way.</Typography>}
+              <Typography variant="caption" color="text.secondary">A false rejection is the pipeline contradicting something said right, the failure that costs a participant their trust. A false acceptance is an error let through. Move a threshold only when this table says so on more than a handful of clips.</Typography>
+            </Stack>
+          </Section>
         )}
 
         <Section title="Export">

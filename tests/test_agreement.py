@@ -61,3 +61,23 @@ def test_bands_use_the_same_word_every_time():
 
 def test_mean_absolute_difference():
     assert agreement.mean_absolute_difference([5, 3, None], [4, 3, 1]) == 0.5
+
+
+def test_confusion_names_the_two_failures_separately():
+    """Six clips: the pipeline contradicted one of four the human passed, and
+    let through one of two the human failed. The two rates use different
+    denominators, because the two mistakes cost different people."""
+    human = [True, True, True, True, False, False]
+    pipe = [True, True, True, False, True, False]
+    c = agreement.confusion(human, pipe)
+    assert c["clips"] == 6
+    assert c["false_rejections"] == 1 and c["false_rejection_rate"] == 25.0
+    assert c["false_acceptances"] == 1 and c["false_acceptance_rate"] == 50.0
+    assert c["accuracy"] == pytest.approx(66.7)
+
+
+def test_confusion_skips_unlabelled_and_unscored():
+    c = agreement.confusion([True, None, False], [None, True, False])
+    assert c["clips"] == 1 and c["both_wrong"] == 1
+    assert c["false_rejection_rate"] is None
+    assert agreement.confusion([], [])["accuracy"] is None
