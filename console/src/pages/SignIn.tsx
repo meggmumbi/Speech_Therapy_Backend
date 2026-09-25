@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
 import { useAuth } from "../auth/AuthContext";
 
 export function SignIn() {
@@ -27,25 +28,21 @@ export function SignIn() {
   }
 
   return (
-    <div className="signin">
-      <form className="card" onSubmit={submit}>
-        <h1>Study console</h1>
-        <p className="muted">Same account as the tablet app. Participants never sign in here.</p>
-        <label className="field">
-          <span>Username</span>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus autoComplete="username" />
-        </label>
-        <label className="field">
-          <span>Password</span>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-        </label>
-        {error && <div className="error">{error}</div>}
-        <div className="row" style={{ marginTop: 12 }}>
-          <button className="btn-primary" disabled={busy || !username || !password}>
+    <Box sx={{ minHeight: "100%", display: "grid", placeItems: "center", p: 3, bgcolor: "background.default" }}>
+      <Paper component="form" onSubmit={submit} sx={{ p: 4, width: "100%", maxWidth: 400 }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h4">Study console</Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>Same account as the tablet app. Participants never sign in here.</Typography>
+          </Box>
+          <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus autoComplete="username" />
+          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          {error && <Alert severity="error">{error}</Alert>}
+          <Button type="submit" variant="contained" size="large" disabled={busy || !username || !password}>
             {busy ? "Signing in…" : "Sign in"}
-          </button>
-        </div>
-      </form>
-    </div>
+          </Button>
+        </Stack>
+      </Paper>
+    </Box>
   );
 }

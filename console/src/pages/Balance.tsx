@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { Alert, Box, Chip, Stack, Table, TableBody, TableCell, TableRow, Typography } from "@mui/material";
 import { study } from "../api/endpoints";
-import { Notice, Pill } from "../components/Layout";
+import { PageHeader, Section, StatCard } from "../components/ui";
 
 /**
  * Cell counts for the 2x2 counterbalance, and the word-list binding.
@@ -10,72 +11,49 @@ import { Notice, Pill } from "../components/Layout";
  */
 export function Balance() {
   const q = useQuery({ queryKey: ["balance"], queryFn: study.balance });
-  if (q.isLoading) return <p className="muted">Loading…</p>;
-  if (q.error) return <Notice tone="bad">{(q.error as Error).message}</Notice>;
+  if (q.isLoading) return <Typography color="text.secondary">Loading…</Typography>;
+  if (q.error) return <Alert severity="error">{(q.error as Error).message}</Alert>;
   const b = q.data!;
   const groups = Object.entries(b.per_group ?? {});
   const total = groups.reduce((s, [, n]) => s + n, 0);
 
   return (
-    <div className="stack" style={{ maxWidth: 900 }}>
-      <div className="page-head">
-        <div>
-          <h1>Balance</h1>
-          <p className="muted">{total} active in the design, {b.excluded} excluded.</p>
-        </div>
-        {b.balanced === false && (
-          <Pill tone="fair">Cells differ by {b.max_cell_difference}</Pill>
-        )}
-        {b.balanced === true && <Pill tone="good">Balanced</Pill>}
-      </div>
-
-      {b.list_problems.length > 0 && (
-        <Notice tone="bad">Word lists: {b.list_problems.join("; ")}</Notice>
-      )}
-
-      <div className="grid-2">
-        {groups.map(([g, n]) => (
-          <div key={g} className="stat">
-            <div className="value">{n}</div>
-            <div className="label">{g}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid-2">
-        <section className="card">
-          <h3>Condition in block 1</h3>
-          <Counts data={b.condition_in_block_1} />
-        </section>
-        <section className="card">
-          <h3>List in block 1</h3>
-          <Counts data={b.list_in_block_1} />
-        </section>
-      </div>
-
-      <section className="card">
-        <h3>Word lists</h3>
-        <table>
-          <tbody>
-            {Object.entries(b.word_lists).map(([k, v]) => (
-              <tr key={k}>
-                <td style={{ width: 120 }}><strong>{k === "test" ? "Assessment set" : `List ${k}`}</strong></td>
-                <td className="muted small">{v ?? <Pill tone="bad">not bound</Pill>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="small muted" style={{ marginTop: 8 }}>Bound in the database by each category's study role. Stimulus editing arrives in the next console step.</p>
-      </section>
-    </div>
+    <Box sx={{ maxWidth: 960 }}>
+      <PageHeader
+        title="Balance"
+        subtitle={`${total} active in the design, ${b.excluded} excluded.`}
+        actions={b.balanced === false
+          ? <Chip color="warning" label={`Cells differ by ${b.max_cell_difference}`} />
+          : b.balanced === true ? <Chip color="success" label="Balanced" /> : null}
+      />
+      <Stack spacing={2}>
+        {b.list_problems.length > 0 && <Alert severity="error">Word lists: {b.list_problems.join("; ")}</Alert>}
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 2 }}>
+          {groups.map(([g, n]) => <StatCard key={g} value={n} label={g} />)}
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+          <Section title="Condition in block 1"><Counts data={b.condition_in_block_1} /></Section>
+          <Section title="List in block 1"><Counts data={b.list_in_block_1} /></Section>
+        </Box>
+        <Section title="Word lists">
+          <Table size="small">
+            <TableBody>
+              {Object.entries(b.word_lists).map(([k, v]) => (
+                <TableRow key={k}>
+                  <TableCell sx={{ width: 160 }}><strong>{k === "test" ? "Assessment set" : `List ${k}`}</strong></TableCell>
+                  <TableCell>{v ? <Typography variant="body2" color="text.secondary">{v}</Typography> : <Chip size="small" color="error" label="not bound" />}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>Bound in the database by each list's study role, from the Stimulus sets page.</Typography>
+        </Section>
+      </Stack>
+    </Box>
   );
 }
 
 function Counts({ data }: { data?: Record<string, number> }) {
-  if (!data) return <p className="muted">—</p>;
-  return (
-    <div className="row">
-      {Object.entries(data).map(([k, n]) => <Pill key={k}>{k} · {n}</Pill>)}
-    </div>
-  );
+  if (!data) return <Typography color="text.secondary">—</Typography>;
+  return <Stack direction="row" spacing={1}>{Object.entries(data).map(([k, n]) => <Chip key={k} label={`${k} · ${n}`} />)}</Stack>;
 }
