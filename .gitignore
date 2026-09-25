@@ -52,3 +52,7 @@ Desktop.ini
 *.log
 
 study_audio/
+
+# research console
+console/node_modules/
+console/dist/

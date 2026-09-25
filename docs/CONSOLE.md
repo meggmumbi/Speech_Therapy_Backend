@@ -71,8 +71,13 @@ before upload so the server stores exactly the format the tablet plays.
 
 ## Order
 
-1. Sign in, participants, assignment. Two days. Replaces the tablet's role
-   as the only place a participant can be created.
+1. Sign in, participants, assignment. **Done 2026-09-25.** `console/`,
+   Vite + React + TypeScript, builds clean under strict settings. Sign-in,
+   participant list with the needs-a-code and consent state visible, enrolment
+   and edit with consent as a hard stop, per-participant page with assignment
+   (cell counts shown beside the button), exclusion with a reason, the
+   five-step protocol as the server reports it, and questionnaire means by
+   block. A balance page. `npm run dev` proxies `/api` to the backend.
 2. Stimulus sets with validation. Two days. Replaces the script.
 3. Model audio. One day. Unblocks the perception items.
 4. Dashboard. One day.
