@@ -18,7 +18,7 @@ export function SignIn() {
     setError(null);
     try {
       await signIn(username.trim(), password);
-      const to = (location.state as { from?: string } | null)?.from ?? "/dashboard";
+      const to = (location.state as { from?: string } | null)?.from ?? "/";
       navigate(to, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in");

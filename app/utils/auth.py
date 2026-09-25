@@ -85,3 +85,11 @@ def blacklist_token(token: str, db: Session):
 def is_token_blacklisted(token: str, db: Session) -> bool:
     """Check if token is blacklisted"""
     return db.query(TokenBlacklist).filter(TokenBlacklist.token == token).first() is not None
+
+async def require_researcher(user=Depends(get_current_user)):
+    """The researcher-only surface. A rater signed in with a valid token
+    still gets 403 from everything except the rating endpoints."""
+    if (getattr(user, "role", None) or "researcher") == "rater":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="raters can only rate")
+    return user

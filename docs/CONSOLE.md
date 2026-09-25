@@ -106,3 +106,9 @@ before upload so the server stores exactly the format the tablet plays.
    false-correction tile exists and says "not yet"; Phase 6 supplies it.
 
 Each step ships on its own and is useful on its own.
+
+5. Rating. **Done 2026-09-25.** Listen-and-judge for the pilot labels and
+   the study ratings, blind, keyboard-driven, with rater accounts that see
+   nothing else; a researcher page for building the stratified sample,
+   creating raters, reading the agreement statistics, adjudicating
+   disagreements and exporting. Phase 6's first item.

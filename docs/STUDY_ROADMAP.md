@@ -379,6 +379,20 @@ perception-item audio needs somewhere to be recorded.
 ## Phase 6 — rater tooling and analysis
 
 - Stratified sampler for the rating set; blind randomised playback UI.
+  **Done 2026-09-25**, in the console. One screen for two tasks: the 78
+  pilot recordings, labelled binary, which feeds `refit_on_labels.py` through
+  an export that fills the CSV's `human_label` column; and the study
+  ratings, several raters, binary plus a 1-5 accuracy plus the sound heard
+  going wrong, over a sample stratified by session type, condition and
+  feature, with a tenth of clips repeated for within-rater consistency.
+  Blind by construction: the queue sends the target and the clip and nothing
+  else -- the old CSV put the verdict, score and transcript in the columns
+  beside the label. Rater accounts carry a role and are refused by every
+  researcher endpoint; participant audio is served signed-in only and never
+  to a rater for a participant who did not consent to retention. Agreement is
+  computed, not described: percent agreement and Cohen's kappa per pair,
+  Fleiss' kappa across all raters, within-rater agreement on the repeats, and
+  a disagreement list for adjudication.
 - Two or three trained raters, ICC / Fleiss kappa reported, adjudication path.
 - Analysis in linear mixed-effects models with participant, item and rater as
   random effects, effect sizes against Plonsky & Oswald benchmarks. This is the

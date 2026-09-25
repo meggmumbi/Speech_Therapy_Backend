@@ -7,12 +7,14 @@ from .api import (
     speech_processing,
     analytics,
     feedback, ws_routes, genericappendpoints, pronunciation, study, authoring,
-    questionnaire,
+    questionnaire, ratings,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
 from .services import analyze_pronunciation, analyse_pronunciation
 from .services.pronunciation.runtime import warmup as warmup_pronunciation
+from .utils.auth import require_researcher
+from fastapi import Depends
 
 Base.metadata.create_all(bind=engine)
 
@@ -37,13 +39,14 @@ app.add_middleware(
 app.include_router(ws_routes.router)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(children.router, prefix="/children", tags=["children"])
-app.include_router(activities.router, prefix="/activities", tags=["activities"])
+app.include_router(children.router, dependencies=[Depends(require_researcher)], prefix="/children", tags=["children"])
+app.include_router(activities.router, dependencies=[Depends(require_researcher)], prefix="/activities", tags=["activities"])
 app.include_router(genericappendpoints.router, prefix="/generic", tags=["generic"])
 app.include_router(speech_processing.router, prefix="/speech", tags=["speech_processing"])
-app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])  # Add this line
+app.include_router(analytics.router, dependencies=[Depends(require_researcher)], prefix="/analytics", tags=["analytics"])  # Add this line
 app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])  # Add this line
 app.include_router(pronunciation.router, prefix="/pronunciation", tags=["pronunciation"])
-app.include_router(study.router, prefix="/study", tags=["study"])
-app.include_router(authoring.router, prefix="/authoring", tags=["authoring"])
-app.include_router(questionnaire.router, prefix="/measures", tags=["questionnaire"])
+app.include_router(study.router, dependencies=[Depends(require_researcher)], prefix="/study", tags=["study"])
+app.include_router(authoring.router, dependencies=[Depends(require_researcher)], prefix="/authoring", tags=["authoring"])
+app.include_router(questionnaire.router, dependencies=[Depends(require_researcher)], prefix="/measures", tags=["questionnaire"])
+app.include_router(ratings.router, prefix="/ratings", tags=["ratings"])
