@@ -20,6 +20,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -212,6 +213,259 @@ def _items_with_attempts(db: Session, item_ids: list[uuid.UUID]) -> set[uuid.UUI
         .all()
     )
     return {row[0] for row in rows}
+
+
+# --- categories and single items --------------------------------------------
+#
+# The bulk import is the right tool for a whole list. These are the right tool
+# for one typo, one added distractor, one recorded file: the console edits a
+# row in place and the server validates it against its type before anything
+# is written, exactly as the import does.
+
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    description: str | None = None
+    #: list_a | list_b | test, or null.
+    study_role: str | None = None
+
+
+class ItemWrite(BaseModel):
+    exercise_type: str
+    spec: dict[str, Any] = Field(default_factory=dict)
+    target_feature: str | None = None
+    match_key: str | None = None
+    description: str | None = None
+    audio_url: str | None = None
+    difficulty_level: str | None = None
+    position: int | None = None
+
+
+def _serialise_item(item: models.ActivityItem, attempts: int = 0) -> dict:
+    return {
+        "id": str(item.id),
+        "category_id": str(item.category_id),
+        "name": item.name,
+        "description": item.description,
+        "exercise_type": item.effective_type,
+        "spec": item.spec or {},
+        "target_feature": item.target_feature,
+        "match_key": item.match_key,
+        "position": item.position,
+        "audio_url": item.audio_url,
+        "difficulty_level": item.difficulty_level,
+        # Whether editing this item would change what stored attempts meant.
+        "attempts": attempts,
+    }
+
+
+def _prepare(row: ItemWrite, category: models.ActivityCategory) -> dict:
+    """Validate one row against its type and derive what the row derives."""
+    try:
+        parsed = exercise_spec.parse(row.exercise_type, row.spec)
+    except exercises.UnknownExerciseType as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ValidationError as exc:
+        problems = "; ".join(
+            f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors())
+        raise HTTPException(422, problems) from exc
+    if row.target_feature and row.target_feature not in exercises.TARGET_FEATURES:
+        raise HTTPException(
+            422, f"{row.target_feature!r} is not a known feature. Known: "
+                 f"{', '.join(exercises.TARGET_FEATURES)}")
+    return {
+        "name": exercise_spec.display_name(parsed)[:300],
+        "description": (row.description or exercise_spec.default_prompt(parsed))[:300],
+        "exercise_type": parsed.exercise_type,
+        "spec": parsed.model_dump(exclude={"exercise_type"}),
+        "target_feature": row.target_feature or None,
+        "match_key": (row.match_key or "").strip() or None,
+        "audio_url": row.audio_url,
+        "difficulty_level": row.difficulty_level or category.difficulty_level,
+        "position": row.position,
+    }
+
+
+@router.get("/categories")
+def list_categories(db: Session = Depends(get_db)):
+    """Every category with its study role and how much of it has been run."""
+    rows = db.query(models.ActivityCategory).order_by(models.ActivityCategory.name).all()
+    out = []
+    for category in rows:
+        item_ids = [i.id for i in db.query(models.ActivityItem.id)
+                    .filter(models.ActivityItem.category_id == category.id).all()]
+        attempted = _items_with_attempts(db, item_ids)
+        out.append({
+            "id": str(category.id),
+            "name": category.name,
+            "description": category.description,
+            "study_role": category.study_role,
+            "difficulty_level": category.difficulty_level,
+            "item_count": len(item_ids),
+            "items_with_attempts": len(attempted),
+            "sessions": db.query(models.TherapySession)
+                          .filter(models.TherapySession.category_id == category.id).count(),
+        })
+    return out
+
+
+@router.post("/categories")
+def create_category(
+    request: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    if request.study_role is not None and request.study_role not in exercises.STUDY_ROLES:
+        raise HTTPException(400, f"study_role must be one of {', '.join(exercises.STUDY_ROLES)} or null")
+    exists = db.query(models.ActivityCategory).filter(
+        models.ActivityCategory.name == request.name.strip()).first()
+    if exists:
+        raise HTTPException(409, f"a category named {request.name.strip()!r} already exists")
+    if request.study_role and db.query(models.ActivityCategory).filter(
+            models.ActivityCategory.study_role == request.study_role).first():
+        raise HTTPException(409, f"another category is already bound as {request.study_role}")
+    category = models.ActivityCategory(
+        id=uuid.uuid4(), name=request.name.strip(),
+        description=request.description, difficulty_level="medium",
+        study_role=request.study_role,
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return {"id": str(category.id), "name": category.name,
+            "study_role": category.study_role, "item_count": 0,
+            "items_with_attempts": 0, "sessions": 0,
+            "description": category.description,
+            "difficulty_level": category.difficulty_level}
+
+
+@router.get("/categories/{category_id}/items")
+def list_items(category_id: uuid.UUID, db: Session = Depends(get_db)):
+    """The typed rows of one list, in authoring order.
+
+    Unlike the activities route this returns the type, the spec and the study
+    fields -- everything the console needs to edit a row -- and says whether
+    each item already has recorded attempts.
+    """
+    category = db.query(models.ActivityCategory).filter(
+        models.ActivityCategory.id == category_id).first()
+    if not category:
+        raise HTTPException(404, "Category not found")
+    items = (db.query(models.ActivityItem)
+             .filter(models.ActivityItem.category_id == category_id).all())
+    items.sort(key=lambda i: (i.position if i.position is not None else 10**6, i.name or ""))
+    counts: dict[uuid.UUID, int] = {}
+    if items:
+        rows = (db.query(models.SessionActivity.item_id, func.count(models.SessionActivity.id))
+                .filter(models.SessionActivity.item_id.in_([i.id for i in items]))
+                .group_by(models.SessionActivity.item_id).all())
+        counts = {item_id: n for item_id, n in rows}
+    return {
+        "category": {"id": str(category.id), "name": category.name,
+                     "study_role": category.study_role},
+        "items": [_serialise_item(i, counts.get(i.id, 0)) for i in items],
+    }
+
+
+@router.post("/categories/{category_id}/items")
+def create_item(
+    category_id: uuid.UUID,
+    request: ItemWrite,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    category = db.query(models.ActivityCategory).filter(
+        models.ActivityCategory.id == category_id).first()
+    if not category:
+        raise HTTPException(404, "Category not found")
+    values = _prepare(request, category)
+    if values["match_key"]:
+        clash = (db.query(models.ActivityItem)
+                 .filter(models.ActivityItem.category_id == category_id,
+                         models.ActivityItem.match_key == values["match_key"]).first())
+        if clash:
+            raise HTTPException(
+                409, f"match_key {values['match_key']!r} is already used by "
+                     f"{clash.name!r} in this list; a slot holds one item per list")
+    if values["position"] is None:
+        last = (db.query(func.max(models.ActivityItem.position))
+                .filter(models.ActivityItem.category_id == category_id).scalar())
+        values["position"] = (last or 0) + 1
+    item = models.ActivityItem(id=uuid.uuid4(), category_id=category_id, **values)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return _serialise_item(item)
+
+
+@router.put("/items/{item_id}")
+def update_item(
+    item_id: uuid.UUID,
+    request: ItemWrite,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    """Edit one item in place.
+
+    Refused if the item has recorded attempts and the edit would change what
+    was asked -- the type or the spec. Those attempts were answers to the old
+    item, and rewriting it would silently move their history under a question
+    the participant never saw. The prompt wording, audio file, feature label
+    and match key can still change, because none of those alters what a stored
+    verdict was a verdict on.
+    """
+    item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    category = db.query(models.ActivityCategory).filter(
+        models.ActivityCategory.id == item.category_id).first()
+    values = _prepare(request, category)
+
+    attempts = len(_items_with_attempts(db, [item.id]))
+    if attempts:
+        n = (db.query(models.SessionActivity)
+             .filter(models.SessionActivity.item_id == item.id).count())
+        if values["exercise_type"] != item.effective_type or values["spec"] != (item.spec or {}):
+            raise HTTPException(
+                409, f"{n} attempt(s) have been recorded against this item. Its "
+                     f"type and content are fixed; create a new item instead.")
+
+    if values["match_key"] and values["match_key"] != item.match_key:
+        clash = (db.query(models.ActivityItem)
+                 .filter(models.ActivityItem.category_id == item.category_id,
+                         models.ActivityItem.match_key == values["match_key"],
+                         models.ActivityItem.id != item.id).first())
+        if clash:
+            raise HTTPException(
+                409, f"match_key {values['match_key']!r} is already used by "
+                     f"{clash.name!r} in this list")
+
+    if values["position"] is None:
+        values["position"] = item.position
+    for key, value in values.items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    n = db.query(models.SessionActivity).filter(models.SessionActivity.item_id == item.id).count()
+    return _serialise_item(item, n)
+
+
+@router.delete("/items/{item_id}")
+def delete_item(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    n = db.query(models.SessionActivity).filter(models.SessionActivity.item_id == item.id).count()
+    if n:
+        raise HTTPException(
+            409, f"{n} attempt(s) have been recorded against this item; deleting "
+                 f"it would orphan them from the question they answered")
+    db.delete(item)
+    db.commit()
+    return {"deleted": str(item_id)}
 
 
 # --- binding a category to the design ---------------------------------------

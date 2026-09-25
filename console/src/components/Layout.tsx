@@ -9,6 +9,7 @@ export function Layout() {
       <nav className="nav">
         <div className="brand">Study console</div>
         <NavLink to="/participants">Participants</NavLink>
+        <NavLink to="/stimuli">Stimulus sets</NavLink>
         <NavLink to="/balance">Balance</NavLink>
         <div className="spacer" />
         <button

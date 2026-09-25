@@ -54,8 +54,9 @@ Nearly everything is already there. Missing:
 - `POST /authoring/items/{id}/audio` to accept a recording and set
   `stimulus_audio`, and `GET` to stream it back. Files under `stimulus_audio/`
   next to `study_audio/`.
-- `PUT /authoring/items/{id}` to edit one item in place. Import exists;
-  single-item edit does not.
+- `PUT /authoring/items/{id}` to edit one item in place. Done, with
+  `GET /authoring/categories`, `GET /authoring/categories/{id}/items`,
+  `POST` to create one item, and `DELETE`.
 - A dashboard aggregate endpoint, or the console composes it from
   `/study/balance`, `/measures/participants/{id}/questionnaires` and the
   session summaries.
@@ -78,7 +79,13 @@ before upload so the server stores exactly the format the tablet plays.
    (cell counts shown beside the button), exclusion with a reason, the
    five-step protocol as the server reports it, and questionnaire means by
    block. A balance page. `npm run dev` proxies `/api` to the backend.
-2. Stimulus sets with validation. Two days. Replaces the script.
+2. Stimulus sets with validation. **Done 2026-09-25.** Lists in a sidebar
+   with their study role, a table of typed rows, an editor shaped by the
+   exercise type, JSON import (check first, then write) and export, role
+   binding from a dropdown, and the design check pinned to the top of the
+   page. The server validates every row against its type before writing and
+   refuses to rewrite the question under an item that has recorded attempts;
+   the prompt wording, feature and slot can still change.
 3. Model audio. One day. Unblocks the perception items.
 4. Dashboard. One day.
 

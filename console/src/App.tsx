@@ -6,6 +6,7 @@ import { Participant } from "./pages/Participant";
 import { ParticipantForm } from "./pages/ParticipantForm";
 import { Participants } from "./pages/Participants";
 import { SignIn } from "./pages/SignIn";
+import { Stimuli } from "./pages/Stimuli";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { signedIn } = useAuth();
@@ -26,6 +27,7 @@ export function App() {
           <Route path="/participants/:id" element={<Participant />} />
           <Route path="/participants/:id/edit" element={<ParticipantForm />} />
           <Route path="/balance" element={<Balance />} />
+          <Route path="/stimuli" element={<Stimuli />} />
         </Route>
         <Route path="*" element={<Navigate to="/participants" replace />} />
       </Routes>
