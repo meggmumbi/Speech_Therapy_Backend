@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, API_BASE } from "./client";
 
 /** Mirrors app/api/authoring.py. */
 
@@ -107,4 +107,15 @@ export const stimuli = {
       method: "POST", json: { items, apply, replace },
     }),
   validate: () => api<DesignCheck>("authoring/item-sets/validate"),
+
+  // ---- model audio ----
+  uploadAudio: (itemId: string, wav: Blob) => {
+    const form = new FormData();
+    form.append("audio", wav, "model.wav");
+    return api<{ item_id: string; audio_url: string; duration_seconds: number }>(
+      `authoring/items/${itemId}/audio`, { method: "POST", body: form });
+  },
+  deleteAudio: (itemId: string) => api<unknown>(`authoring/items/${itemId}/audio`, { method: "DELETE" }),
+  /** Where the browser fetches the stored file from. Same base as every other call. */
+  audioUrl: (itemId: string) => `${API_BASE}authoring/items/${itemId}/audio`,
 };

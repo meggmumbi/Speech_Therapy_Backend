@@ -18,7 +18,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -26,7 +27,7 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..database import get_db
 from ..schemas import exercise_spec
-from ..services import exercises
+from ..services import exercises, stimulus_audio
 from ..utils.auth import get_current_user
 
 router = APIRouter(tags=["authoring"])
@@ -466,6 +467,89 @@ def delete_item(
     db.delete(item)
     db.commit()
     return {"deleted": str(item_id)}
+
+
+# --- model audio ---------------------------------------------------------------
+
+@router.post("/items/{item_id}/audio")
+async def upload_item_audio(
+    item_id: uuid.UUID,
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    """Store one speaker's recording of this item as its model audio.
+
+    Normalised to 16 kHz mono PCM on the way in, so the console can send
+    whatever the browser produced. For a minimal pair this is the stimulus the
+    participant identifies; for every other type it is the model the robot
+    plays instead of synthesising the word afresh each turn -- which is what a
+    pilot participant heard as "the pronunciation was different when it
+    repeated".
+
+    Allowed on an item with recorded attempts: the audio changes what future
+    participants hear, not what stored verdicts were verdicts on.
+    """
+    item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    raw = await audio.read()
+    if not raw:
+        raise HTTPException(400, "empty upload")
+    try:
+        path, duration = stimulus_audio.store(item.id, raw)
+    except stimulus_audio.BadAudio as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    url = stimulus_audio.url_for(item.id)
+    item.audio_url = url
+    if item.effective_type == exercises.MINIMAL_PAIR_ID:
+        spec = dict(item.spec or {})
+        spec["stimulus_audio"] = url
+        item.spec = spec
+    db.commit()
+    db.refresh(item)
+    return {
+        "item_id": str(item.id),
+        "audio_url": url,
+        "duration_seconds": round(duration, 2),
+        "stored_at": str(path),
+    }
+
+
+@router.get("/items/{item_id}/audio")
+def get_item_audio(item_id: uuid.UUID, db: Session = Depends(get_db)):
+    """The stored recording, as WAV.
+
+    Unauthenticated on purpose. A stimulus word is not sensitive, and the
+    tablet's media player fetches by URL with no way to attach a token.
+    """
+    item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    path = stimulus_audio.path_for(item.id)
+    if not path.exists():
+        raise HTTPException(404, "No audio recorded for this item")
+    return FileResponse(str(path), media_type="audio/wav", filename=f"{item.name}.wav")
+
+
+@router.delete("/items/{item_id}/audio")
+def delete_item_audio(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    removed = stimulus_audio.remove(item.id)
+    item.audio_url = None
+    if item.spec and "stimulus_audio" in item.spec:
+        spec = dict(item.spec)
+        spec.pop("stimulus_audio", None)
+        item.spec = spec
+    db.commit()
+    return {"item_id": str(item_id), "removed": removed}
 
 
 # --- binding a category to the design ---------------------------------------

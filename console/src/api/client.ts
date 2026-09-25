@@ -7,7 +7,8 @@
  * and the second is the one a researcher can act on.
  */
 
-const BASE: string = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api/";
+export const API_BASE: string = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api/";
+const BASE = API_BASE;
 const TOKEN_KEY = "console.token";
 
 export class ApiError extends Error {

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { stimuli, type Category, type ImportReport, type Item, type ItemWrite } from "../api/stimuli";
 import { Notice, Pill } from "../components/Layout";
 import { ItemEditor } from "./ItemEditor";
+import { RecordingPanel } from "./RecordingPanel";
 
 /**
  * The stimulus sets.
@@ -173,6 +174,19 @@ export function Stimuli() {
                 error={error}
               />
             </div>
+          )}
+          {editing !== null && editing !== "new" && (
+            <RecordingPanel
+              item={editing}
+              onChanged={() => {
+                invalidate();
+                // Keep the editor on the same item, refreshed.
+                stimuli.items(current!).then((r) => {
+                  const fresh = r.items.find((i) => i.id === editing.id);
+                  if (fresh) setEditing(fresh);
+                });
+              }}
+            />
           )}
 
           {category && (

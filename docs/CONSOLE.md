@@ -52,8 +52,9 @@ a query against tables that already exist.
 Nearly everything is already there. Missing:
 
 - `POST /authoring/items/{id}/audio` to accept a recording and set
-  `stimulus_audio`, and `GET` to stream it back. Files under `stimulus_audio/`
-  next to `study_audio/`.
+  `stimulus_audio`, and `GET` to stream it back. Done; files under
+  `stimulus_audio/` next to `study_audio/`. The GET is unauthenticated: a
+  stimulus word is not sensitive, and the tablet's media player fetches by URL.
 - `PUT /authoring/items/{id}` to edit one item in place. Done, with
   `GET /authoring/categories`, `GET /authoring/categories/{id}/items`,
   `POST` to create one item, and `DELETE`.
@@ -86,7 +87,14 @@ before upload so the server stores exactly the format the tablet plays.
    page. The server validates every row against its type before writing and
    refuses to rewrite the question under an item that has recorded attempts;
    the prompt wording, feature and slot can still change.
-3. Model audio. One day. Unblocks the perception items.
+3. Model audio. **Done 2026-09-25.** A recording panel under the item
+   editor: record, listen back, keep. The browser decodes and resamples to
+   16 kHz mono WAV before upload, the server normalises level and stores one
+   file per item, and the tablet fetches it once, caches it, and plays it
+   after the spoken instruction -- at 0.7x for the slow replay, so the slow
+   version is the same file at a different rate. With a recording present the
+   robot no longer says the word itself; two models is the inconsistency the
+   recording exists to remove.
 4. Dashboard. One day.
 
 Each step ships on its own and is useful on its own.

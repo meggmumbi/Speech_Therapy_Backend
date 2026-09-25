@@ -56,3 +56,6 @@ study_audio/
 # research console
 console/node_modules/
 console/dist/
+
+# recorded model audio, per item
+stimulus_audio/
