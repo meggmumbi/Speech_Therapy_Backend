@@ -113,6 +113,15 @@ Each step ships on its own and is useful on its own.
    creating raters, reading the agreement statistics, adjudicating
    disagreements and exporting. Phase 6's first item.
 
+   Model audio can also be **uploaded** (2026-10-01), for machines whose
+   microphone does not work: a recording made on a phone in any format the
+   browser decodes is converted to 16 kHz mono WAV and trimmed of its
+   leading and trailing silence in the browser, then heard back and kept
+   through the same step as a live take. The server never sees anything but
+   WAV, so nothing downstream changed. Recording from the Pepper app was the
+   other option and was not taken: it would put an authoring screen and a
+   researcher login into the participant's app, on the tablet microphone.
+
    A third task, **Review the pipeline**, was added the same day: the
    researcher's own audit of the attempts the scorer was least sure about
    (transcript rescues, rejections despite the transcript holding the

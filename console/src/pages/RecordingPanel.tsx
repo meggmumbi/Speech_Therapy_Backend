@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Chip, Stack, Typography } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import StopIcon from "@mui/icons-material/Stop";
 import CheckIcon from "@mui/icons-material/Check";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { stimuli, type Item } from "../api/stimuli";
-import { Recorder } from "../audio/recorder";
+import { Recorder, fileToWav } from "../audio/recorder";
 import { ConfirmDialog, Section } from "../components/ui";
 
 /**
@@ -15,6 +16,10 @@ import { ConfirmDialog, Section } from "../components/ui";
  * The flow is record, hear it, then upload -- never record-and-upload in one
  * step. What the researcher approves here is exactly what every participant
  * will hear, on every presentation, so the listen-back is not a nicety.
+ *
+ * A file can stand in for the microphone: recorded on a phone, chosen here,
+ * decoded and trimmed in the browser, then heard back and kept exactly like
+ * a live take. Same listen-back, same upload, same stored format.
  */
 export function RecordingPanel({ item, onChanged }: { item: Item; onChanged: () => void }) {
   const qc = useQueryClient();
@@ -25,6 +30,8 @@ export function RecordingPanel({ item, onChanged }: { item: Item; onChanged: () 
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [decoding, setDecoding] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => { if (takeUrl) URL.revokeObjectURL(takeUrl); }, [takeUrl]);
   useEffect(() => {
@@ -57,6 +64,22 @@ export function RecordingPanel({ item, onChanged }: { item: Item; onChanged: () 
     }
   }
 
+  async function chooseFile(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    setDecoding(true);
+    try {
+      const blob = await fileToWav(file);
+      setTake(blob);
+      setTakeUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read that file");
+    } finally {
+      setDecoding(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
   const hasStored = Boolean(item.audio_url);
   const isPair = item.exercise_type === "minimal_pair_id";
   const spec = item.spec as Record<string, unknown>;
@@ -78,6 +101,10 @@ export function RecordingPanel({ item, onChanged }: { item: Item; onChanged: () 
         <Button variant="contained" color={recording ? "error" : "secondary"} startIcon={recording ? <StopIcon /> : <MicIcon />} onClick={toggle}>
           {recording ? `Stop (${seconds.toFixed(1)}s)` : "Record"}
         </Button>
+        <Button variant="outlined" color="secondary" startIcon={<UploadFileIcon />} disabled={recording || decoding} onClick={() => fileInput.current?.click()}>
+          {decoding ? "Reading…" : "Upload a recording"}
+        </Button>
+        <input ref={fileInput} type="file" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm,.aac,.opus" hidden onChange={(e) => chooseFile(e.target.files?.[0])} />
         {takeUrl && (
           <>
             <audio controls src={takeUrl} />
@@ -88,6 +115,12 @@ export function RecordingPanel({ item, onChanged }: { item: Item; onChanged: () 
           </>
         )}
       </Stack>
+
+      {!takeUrl && !hasStored && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+          No working microphone here? Record it on a phone and upload the file: it is converted, trimmed and played back for you to check before it is kept.
+        </Typography>
+      )}
 
       {hasStored && !takeUrl && (
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 2 }}>
