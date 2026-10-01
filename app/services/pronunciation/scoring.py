@@ -280,6 +280,22 @@ def _focus_errors(diagnoses: Sequence[PhoneDiagnosis],
     ]
 
 
+def _weak_focus(diagnoses: Sequence[PhoneDiagnosis],
+                focus_phones: Collection[str] | None) -> list[PhoneDiagnosis]:
+    """Focus phones the decode matched but the acoustics scored as an error.
+
+    Not an error on their own: the decode agreeing is one signal for the
+    phone. They become one when a recogniser, asked, does not hear the
+    target word either. "rice" said as "lice" a second time decoded as
+    R IH L AY S -- a spurious R before the L -- so the R was "matched",
+    scored 0.45, and the word passed at 0.61; Whisper wrote "Nice".
+    """
+    if not focus_phones:
+        return []
+    focus = {strip_stress(p) for p in focus_phones}
+    return [d for d in diagnoses if d.kind == "weak" and strip_stress(d.expected) in focus]
+
+
 def transcript_matches_target(transcript: str | None, target: str,
                               reference: Reference | None) -> bool | None:
     """Did the client's ASR hear the target word?
@@ -611,11 +627,15 @@ def score_phone_sequence(
                             phone_scores=phone_scores,
                             focus_errors=focus_errors)
 
-    if (verdict != "correct" and transcript is None
+    weak_focus = (_weak_focus(diagnoses, focus_phones)
+                  if config.focus_phone_rule and config.weak_focus_asks_recogniser
+                  and verdict == "correct" else [])
+    if ((verdict != "correct" or weak_focus) and transcript is None
             and transcript_provider is not None):
         # The acoustics say wrong and no client transcript exists to check
         # that against: now, and only now, ask the server-side recogniser.
-        # Its answer can rescue the verdict but never worsen it.
+        # Its answer can rescue the verdict but never worsen it -- with one
+        # exception, below, for a weak target-feature phone.
         with timings.stage("asr"):
             try:
                 transcript = transcript_provider(waveform, sample_rate)
@@ -628,6 +648,17 @@ def score_phone_sequence(
                                 transcript_match=heard_target,
                                 phone_scores=phone_scores,
                                 focus_errors=focus_errors)
+    if weak_focus and heard_target is False:
+        # The one place a transcript may condemn. The acoustics scored the
+        # item's own target phone as an error, and an independent recogniser
+        # did not hear the target word: two models, neither of which heard
+        # the contrast. A transcript that does contain the target leaves the
+        # verdict alone, as does having no transcript at all.
+        focus_errors = list(focus_errors) + weak_focus
+        verdict = _classify(verdict_score, diagnoses, stress, config,
+                            transcript_match=heard_target,
+                            phone_scores=phone_scores,
+                            focus_errors=focus_errors)
 
     return AttemptScore(
         word=target,

@@ -109,3 +109,50 @@ def test_feedback_names_the_focus_phone_even_above_the_ceiling():
 def test_the_switch_restores_the_old_behaviour():
     off = PipelineConfig(backend="stub", focus_phone_rule=False)
     assert off.config_hash() != CONFIG.config_hash()
+
+
+def test_weak_focus_phones_are_listed_but_not_errors_on_their_own():
+    from app.services.pronunciation.scoring import _weak_focus
+    weak_r = PhoneDiagnosis(index=0, expected="R", observed="L", kind="weak", score=0.45, articulatory_distance=0.0)
+    assert _weak_focus([weak_r], {"R", "L"}) == [weak_r]
+    assert _weak_focus([weak_r], {"IH", "IY"}) == []
+    assert _weak_focus([weak_r], None) == []
+    # On its own the acoustics-only verdict stands: 0.61 is above the line.
+    assert _classify(0.61, [weak_r], None, CONFIG, focus_errors=[]) == "correct"
+    # With a recogniser that did not hear the word, it is a focus error.
+    assert _classify(0.61, [weak_r], None, CONFIG, transcript_match=False, focus_errors=[weak_r]) == "close"
+
+
+def test_the_second_lice_is_caught_end_to_end(monkeypatch):
+    """'rice' said as 'lice': decode R IH L AY S, R weak at 0.45, aggregate
+    0.61, Whisper 'Nice'. Correct before; close now, and the transcript is
+    kept so D can say what it heard."""
+    from app.services.pronunciation import scoring
+
+    weak_r = PhoneDiagnosis(index=0, expected="R", observed="L", kind="weak", score=0.45, articulatory_distance=0.0)
+    monkeypatch.setattr(scoring, "_diagnose", lambda *a, **k: [weak_r])
+    monkeypatch.setattr(scoring, "aggregate_score", lambda *a, **k: 0.61)
+    calls = []
+
+    def whisper(_w, _sr):
+        calls.append(1)
+        return "Nice"
+
+    from app.services.pronunciation import StubAcousticModel
+    import numpy as np
+    model = StubAcousticModel(produced=["R", "AY", "S"], frames_per_phone=5, confidence=0.95)
+    t = np.arange(int(16000 * 0.3)) / 16000
+    wave = (0.2 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    r = scoring.score_attempt("rice", wave, 16000, model, CONFIG,
+                              transcript_provider=whisper, focus_phones={"R", "L"})
+    assert calls, "the recogniser was consulted"
+    assert r.verdict == "close" and not r.is_correct
+    assert r.transcript == "Nice" and r.transcript_matches is False
+    assert [d.expected for d in r.focus_errors] == ["R"]
+    # Same audio, a recogniser that hears the word: the acoustics stand.
+    r2 = scoring.score_attempt("rice", wave, 16000, model, CONFIG,
+                               transcript_provider=lambda w, s: "Rice.", focus_phones={"R", "L"})
+    assert r2.verdict == "correct"
+    # And no recogniser at all leaves it alone too.
+    r3 = scoring.score_attempt("rice", wave, 16000, model, CONFIG, focus_phones={"R", "L"})
+    assert r3.verdict == "correct"

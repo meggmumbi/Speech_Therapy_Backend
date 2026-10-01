@@ -160,12 +160,20 @@ class PipelineConfig:
     # refused over such a phone, because Whisper restores exactly these
     # contrasts ("tree" -> "three") and so cannot vouch for them.
     #
+    # A focus phone the decode matched but the acoustics scored below
+    # phone_error ("weak") is failed only if a recogniser, asked, does not
+    # hear the target word either -- the one case where a transcript may
+    # condemn, and it takes two models not hearing the contrast to do it.
+    #
     # Replaying the stored per-phone data from 2026-09-17 to 10-01 rejects
     # 20 of the 98 "correct" verdicts on feature items; the two false
     # accepts above are among them, as are all seven transcript rescues
     # that had overridden a target-feature phone. Items with no target
     # feature are untouched. Off, the 2026-09-25 behaviour returns exactly.
     focus_phone_rule: bool = True
+    # The second half of the rule above; separate so the config hash records
+    # which attempts were scored with it (added 2026-10-01, afternoon).
+    weak_focus_asks_recogniser: bool = True
 
     sample_rate: int = 16_000
     # wav2vec2 emits one frame per 20 ms of audio at 16 kHz.

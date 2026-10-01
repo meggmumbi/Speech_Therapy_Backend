@@ -423,8 +423,20 @@ perception-item audio needs somewhere to be recorded.
   such a phone, since Whisper restores exactly these contrasts. Feedback
   names the failed phone even when it scored above the nameable ceiling,
   so D says "I heard bite. The word is bit. The sound to fix is ...".
-  Items without a target feature are untouched; `focus_phone_rule=False`
-  restores the 09-25 behaviour exactly. Replayed on the stored per-phone
+  Later the same day "lice" passed a second time: the decode put a spurious
+  R before the L (R IH L AY S), so the R was "matched", scored 0.45, and the
+  word averaged 0.61. A focus phone the decode matched but the acoustics
+  scored below phone_error now triggers the recogniser, and if it does not
+  hear the target word either the phone fails -- the one place a transcript
+  may condemn, and it takes two models not hearing the contrast. On the
+  stored data this touches that one attempt and nothing else. The schwa
+  case ("camera" read as ca-me-ra, AH -> EH at 0.71) is NOT caught: the
+  acoustic model scores a full vowel for schwa leniently, and the only rule
+  that would catch it -- fail any decode substitution of a focus phone
+  regardless of score -- also rejects 24 other stored corrects including
+  productions made right after a correction. That trade-off waits for
+  labels. Items without a target feature are untouched;
+  `focus_phone_rule=False` restores the 09-25 behaviour exactly. Replayed on the stored per-phone
   data since 09-17 it rejects 20 of 98 "correct" verdicts on feature
   items, including both above and all seven rescues that had overridden a
   target phone; those 20 are in the review task under `focus_phone` so the
