@@ -112,6 +112,13 @@ def transcribe(waveform: np.ndarray, sample_rate: int,
         condition_on_previous_text=False,
         vad_filter=False,
         without_timestamps=True,
+        # Deterministic. The default is a temperature ladder that resamples
+        # when the first pass looks poor, and on 2026-10-01 the same clip of
+        # "full" read "before." at scoring time and "full." when re-scored.
+        # A verdict that depends on which run of the recogniser you got is
+        # not reproducible from the stored config hash, which is the one
+        # promise the provenance columns make.
+        temperature=0.0,
     )
     text = " ".join(s.text.strip() for s in segments).strip()
     return text or None
