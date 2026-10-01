@@ -48,5 +48,7 @@ app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])  # Ad
 app.include_router(pronunciation.router, prefix="/pronunciation", tags=["pronunciation"])
 app.include_router(study.router, dependencies=[Depends(require_researcher)], prefix="/study", tags=["study"])
 app.include_router(authoring.router, dependencies=[Depends(require_researcher)], prefix="/authoring", tags=["authoring"])
+# The stored model audio, fetched by the tablet's player with no token.
+app.include_router(authoring.public_router, prefix="/authoring", tags=["authoring"])
 app.include_router(questionnaire.router, dependencies=[Depends(require_researcher)], prefix="/measures", tags=["questionnaire"])
 app.include_router(ratings.router, prefix="/ratings", tags=["ratings"])

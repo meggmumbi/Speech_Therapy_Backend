@@ -31,6 +31,12 @@ from ..services import exercises, stimulus_audio
 from ..utils.auth import get_current_user
 
 router = APIRouter(tags=["authoring"])
+# Mounted without the researcher fence. Holds the one route the tablet's
+# media player fetches by bare URL, which cannot carry a token. When the
+# rater role arrived on 2026-09-25 the whole /authoring prefix was put
+# behind require_researcher, and this route went with it: the tablet got
+# 401, the player logged it and gave up, and no model audio played.
+public_router = APIRouter(tags=["authoring"])
 
 
 # --- request shapes ---------------------------------------------------------
@@ -517,12 +523,13 @@ async def upload_item_audio(
     }
 
 
-@router.get("/items/{item_id}/audio")
+@public_router.get("/items/{item_id}/audio")
 def get_item_audio(item_id: uuid.UUID, db: Session = Depends(get_db)):
     """The stored recording, as WAV.
 
-    Unauthenticated on purpose. A stimulus word is not sensitive, and the
-    tablet's media player fetches by URL with no way to attach a token.
+    Unauthenticated on purpose, and on `public_router` so that it stays so.
+    A stimulus word is not sensitive, and the tablet's media player fetches
+    by URL with no way to attach a token.
     """
     item = db.query(models.ActivityItem).filter(models.ActivityItem.id == item_id).first()
     if not item:
