@@ -1,0 +1,68 @@
+// Part 4 of the system guide: reading the findings.
+module.exports = function part4(h) {
+  const { P, H1, H2, B, I, bullet, table, gap, TextRun, Paragraph, PageBreak } = h;
+  const step = (runs) => new Paragraph({ numbering: { reference: "steps4", level: 0 }, spacing: { after: 80 }, children: typeof runs === "string" ? [new TextRun(runs)] : runs });
+
+  return [
+    new Paragraph({ children: [new PageBreak()] }),
+    new Paragraph({ spacing: { before: 1200, after: 120 }, children: [new TextRun({ text: "Part 4", bold: true, size: 48, color: "1F3A5F" })] }),
+    new Paragraph({ spacing: { after: 400 }, children: [new TextRun({ text: "Reading the findings: what each result would mean, and what none of them can mean", size: 30, color: "555555" })] }),
+    P("Parts 1 to 3 built the instrument, described what it records, and set out how the records are analysed. This part is about the last step, which is also the one reviewers read hardest: turning a table of odds ratios into a claim, and stopping at the claim the design can carry. It is written before the data exist on purpose. An interpretation decided after seeing the numbers is a different kind of statement, and this document is where the pre-specified one lives."),
+
+    H1("23. Three things to settle before reading any outcome"),
+    H2("23.1 Every verdict is an instrument reading"),
+    P("A row in the attempt table says the pipeline judged the attempt correct or not. It does not say the attempt was correct. The distance between the two is the false-correction rate from the rated clips, and it is the first number to report, per feature. Where it is low the pipeline's verdicts can be read as production accuracy. Where it is high, the outcome for that feature is \"what the pipeline did\", and that is not nothing: a participant who was wrongly corrected still heard a correction and still reacted to it. But it is a different claim, about the tutor's behaviour rather than the learner's speech, and the two must not be mixed in one sentence."),
+    H2("23.2 The two conditions differ in more than the diagnosis"),
+    P("D says about twice as many words as K. Part 2 showed 12.9 against 6.8 for P1. Any D advantage is therefore an advantage of a longer, more specific utterance, and the paper says so. The length-matched filler narrows the gap; the sensitivity model with utterance length as a covariate tells how much of the effect survives when length is held constant. If the effect vanishes under that model, the honest claim is that participants respond to more feedback, not to diagnostic feedback as such."),
+    H2("23.3 Learning is measured; learning by condition is not"),
+    P("Section 18 made this point and it governs part 4. Pre-to-post change on the test words is a within-participant learning measure with no condition attached, because every feature was trained under both conditions in every participant. Nothing in this document, and nothing in the paper, should read \"D produced more durable learning than K\" unless the assessment design is changed to include the trained words themselves."),
+
+    H1("24. What each pattern of results supports"),
+    P("The table reads across: a pattern in the primary outcomes, the claim it licenses, and the claim it does not. The patterns are not exhaustive, but the ones most likely to arise are here, so that the writing-up is a matter of finding the row."),
+    table(["If the data show", "The claim this supports", "The claim it does not support"], [
+      ["Uptake higher under D (M2, OR clearly above 1), trust higher under D (M5), no difference in first-attempt accuracy (M1)", "Diagnostic feedback leads to more successful repairs on the next attempt and is trusted more. The clean result for H1 and H4.", "That participants learned more from D. Uptake is immediate repair; retention is the assessment contrast, which has no condition."],
+      ["Uptake higher under D, trust no different or lower", "D works on the attempt but not on the relationship. Possibly the diagnosis is heard as criticism, or as too long. The open comment and the feedback_helpful taps say which.", "That D is better. The study's own definition of success includes trust, because a tutor that is not trusted is not used."],
+      ["Uptake no different, trust higher under D", "The diagnosis is appreciated but does not change the repair. Consistent with corrections being acted on through the re-model, which both conditions share.", "That the diagnosis is useless. It changed something the participants valued; a longer study might find the repair effect."],
+      ["No difference on any of M1 to M5", "Re-modelling carries the effect of feedback at this grain; the diagnosis adds nothing measurable. A publishable null if the instrument checks pass and power was adequate.", "That diagnostic feedback does not work in general. Twenty-one items and one session per condition is a narrow test."],
+      ["Uptake effect present only on some features (M6)", "The effect lives in contrasts a learner can act on from a verbal cue (dental fricatives, vowel length) and not in ones they cannot hear (the TRAP/STRUT merger). Read beside the audit: if those are also the features the pipeline judges worst, the pattern is instrument, not learner.", "A general effect averaged across features. Report the features separately."],
+      ["Post-test gain, delayed gain smaller but present (M4)", "One session of robot practice improved production of untrained words carrying the same contrasts, and some of it lasted a week. The generalisation claim.", "That the gain came from either feedback condition, or from the robot rather than from an hour of attention to pronunciation."],
+      ["Post-test gain, delayed gain absent", "Immediate improvement without retention. Common in single-session pronunciation training and worth reporting as such.", "That the training failed. The paper should name the dose: 42 items under feedback."],
+      ["Gain on the pipeline's verdicts but not on the raters' labels (M7)", "The pipeline's threshold moved with the participants' speech in a way listeners did not hear, or the raters are measuring something coarser. Either way the instrument result does not stand alone.", "Learning. Report the disagreement itself as a finding of the instrument paper."],
+      ["Rhotic items improve sharply, everything else little", "Nothing yet. This is the tapped-R signature from part 1: the model's R scores sit on the threshold for Kenyan speakers, and small shifts flip verdicts.", "Learning of /r/. Not until the rated clips show the raters heard it too."],
+    ], [3100, 3300, 2960]),
+
+    H1("25. Claims that are off limits whatever the numbers say"),
+    bullet([B("Retention by condition. "), new TextRun("Not measurable with the current assessment set, as above.")]),
+    bullet([B("Comparison with a human tutor, or with no tutor. "), new TextRun("There is no control arm. The study compares two feedback designs delivered by the same robot.")]),
+    bullet([B("Phone-level diagnosis accuracy. "), new TextRun("On Speechocean762 the pipeline names the right substituted phone about one time in five. The D condition's \"the sound to fix is\" line is therefore right about the word being wrong far more often than about which sound. The study tests whether saying it helps, not whether it is phonetically correct; the instrument paper reports the precision.")]),
+    bullet([B("Generality beyond the sample. "), new TextRun("Kenyan university students, mostly with Bantu or Nilotic first languages, self-rating at B2 to C2, one hour with a robot. The seven features are Kenyan English transfer features. Nothing transfers to other learner populations without re-validation of the reference pronunciations and the thresholds.")]),
+    bullet([B("Perception outcomes as learning. "), new TextRun("The minimal-pair taps are made during training, after hearing the model. They measure perception under instruction, not a change in perception, because there is no perception item in the assessments.")]),
+    bullet([B("Anything from excluded data. "), new TextRun("Gated recordings, skipped items, tap-through questionnaires and sessions with an exclusion note are out, and the counts of each are in the paper. Reintroducing any of them to reach significance is the one thing this document exists to prevent.")]),
+
+    H1("26. Known limits of the instrument"),
+    table(["Limit", "Where it shows", "What is done about it", "What remains"], [
+      ["Tapped /r/", "R scores of 0.44 to 0.64 for the same speaker's productions; decode hears L; Whisper hears the word", "Flagged in the audit; rater judgement decides; a per-feature rescue rule is ready if the raters say the productions were right", "Rhotic results are reported separately and with the audit beside them"],
+      ["Schwa leniency", "A full vowel for schwa (ca-me-ra) scores 0.71; the rule that would catch it also rejects 24 other stored corrects", "Nothing yet; needs labels", "Schwa-reduction results are instrument-weak until relabelled"],
+      ["Recogniser lexical bias", "Whisper writes 'three' for 'tree', 'full' for 'fur'", "Rescue refused over target-feature phones; recogniser may condemn only with a weak acoustic phone", "A rescue can still pass a non-target error the acoustics missed"],
+      ["Calibration population", "The MD layer and the 0.60 threshold were fitted on Mandarin-L1 English (Speechocean762)", "Refit on the 78 pilot clips once labelled (refit_on_labels.py)", "Until then, thresholds are borrowed, not local"],
+      ["Two-way verdict", "close and incorrect were fitted to the same threshold because the score does not separate them", "Reported as two-way; feedback treats them identically", "No graded severity in the verdict; the graded score carries that"],
+      ["Recording quality", "Loud or distant recordings; the 'foil' and 'before' captures in P1's run", "Peak, loudness and clipping stored; the dashboard shows quality per day", "A clean recording of an unclear production still scores"],
+      ["Feedback length", "D about twice K in words", "Filler in K; length as a covariate", "A residual confound in any D advantage"],
+    ], [1700, 2600, 2700, 2360]),
+
+    H1("27. P1's run, read as a dress rehearsal"),
+    P("The point of the end-to-end run was not a result but a test of whether the record can be read. It can. The four sessions carry their types and conditions; every spoken attempt has a verdict, a transcript where one was needed, and the phone-level evidence; the two questionnaires are complete and the duration column shows they were tap-throughs; the export runs, and the analysis script says exactly which numbers one participant can and cannot support. The per-feature table shows a TRAP/STRUT merger at 0 of 3 both times, which is what a stable transfer feature looks like, and a rhotic row that moved from 0 to 2 of 3 and must not be read until the clips are rated."),
+    P("What the run also showed is that every one of the eighteen recordings you flagged fell into a row of section 24's last entry or into section 26's first two rows. That is the instrument telling you where its edges are before the first participant arrives, which is the best time to find out."),
+
+    H1("28. Before the first participant"),
+    step([B("Label the 78 pilot clips "), new TextRun("in the rating screen and refit the threshold on local speech. Until then the calibration is borrowed.")]),
+    step([B("Judge the review set, "), new TextRun("in particular the 20 attempts the focus-phone rule rejects and the five tapped-R rejections from P1's run. Then decide the rhotic rescue rule from what you heard, not from the simulation.")]),
+    step([B("Decide the retention question. "), new TextRun("If the paper needs retention by condition, the assessments must include the trained words; if not, write the claim as learning without attribution and move on.")]),
+    step([B("Recruit two raters, "), new TextRun("agree the rating instructions, and settle the ethics position on serving participant audio to them (the system already refuses clips from participants who declined retention).")]),
+    step([B("Apply the re-score "), new TextRun("so the stored verdicts match the current pipeline, and record the config hash the study starts under. Every participant should be scored under one hash; if the pipeline changes mid-study, re-score everyone and report it.")]),
+    step([B("Install the current app on Pepper "), new TextRun("and confirm the model audio plays on the robot's tablet, not only on the phone.")]),
+    step([B("Run one more end-to-end rehearsal "), new TextRun("with a colleague, questionnaires answered honestly, and read the export together.")]),
+    gap(),
+    P([I("This document regenerates from docs/guide: the diagrams, the worked numbers and the tables are produced by scripts against the database, so a later revision is a rebuild, not a rewrite.")]),
+  ];
+};
