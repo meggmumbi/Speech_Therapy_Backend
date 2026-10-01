@@ -297,6 +297,16 @@ def primary_diagnosis(result: AttemptScore) -> PhoneDiagnosis | None:
     a learner can act on and more exposed to the precision limits -- naming
     three phones means three chances to be wrong.
     """
+    # A failed target-feature phone is the diagnosis, whatever it scored: it
+    # is what made the attempt wrong, and it is the sound the item teaches.
+    # Without this, "bit" said as "bite" (IH at 0.58, above the ceiling
+    # below) was marked wrong and then given no sound to fix.
+    focus = [
+        d for d in result.focus_errors
+        if strip_stress(d.expected) in PHONE_EXEMPLARS and _is_coachable(d.expected)
+    ]
+    if focus:
+        return min(focus, key=lambda d: d.score)
     # Only name a sound the acoustics agree was weak. Naming a phone that
     # scored 1.0 -- which the raw decode routinely reports as deleted when a
     # final stop is unreleased -- tells the learner to fix something they did

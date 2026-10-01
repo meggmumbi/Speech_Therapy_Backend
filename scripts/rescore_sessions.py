@@ -41,7 +41,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services.exercises import needs_asr  # noqa: E402
+from app.services.exercises import focus_phones_for, needs_asr  # noqa: E402
 
 
 def main() -> int:
@@ -95,7 +95,8 @@ def main() -> int:
     sql = f"""
         SELECT sa.session_id, sa.item_id, ai.name, ac.name, sa.attempt_number,
                sa.verdict, sa.verdict_score, sa.is_correct, sa.transcript,
-               sa.config_hash, sa.id, sa.exercise_type, ai.exercise_type, ai.spec
+               sa.config_hash, sa.id, sa.exercise_type, ai.exercise_type, ai.spec,
+               ai.target_feature
         FROM session_activities sa
         JOIN activity_items ai ON ai.id = sa.item_id
         LEFT JOIN activity_categories ac ON ac.id = ai.category_id
@@ -118,7 +119,8 @@ def main() -> int:
     out_rows = []
     updates: list[dict] = []
     for (sid, iid, word, cat, att, v_old, s_old, ok_old, tx_old, cfg_old,
-         attempt_id, type_old, item_type, spec) in rows:
+         attempt_id, type_old, item_type, spec, feature) in rows:
+        focus = focus_phones_for(feature)
         if isinstance(spec, str):
             spec = json.loads(spec)
         spec = spec or {}
@@ -143,10 +145,12 @@ def main() -> int:
                     else asr.provider_for(config.server_asr))
         if sentence:
             r = score_sentence(sentence, target, wav, sr, model, config,
-                               transcript=tx_old, transcript_provider=provider)
+                               transcript=tx_old, transcript_provider=provider,
+                               focus_phones=focus)
         else:
             r = score_attempt(target, wav, sr, model, config,
-                              transcript=tx_old, transcript_provider=provider)
+                              transcript=tx_old, transcript_provider=provider,
+                              focus_phones=focus)
         was[v_old] += 1
         now[r.verdict] += 1
         if cfg_old != config.config_hash():

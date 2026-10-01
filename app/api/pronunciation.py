@@ -311,15 +311,18 @@ async def score_pronunciation_attempt(
     # Server-side recognition, invoked only if the acoustics say wrong and the
     # client sent nothing to check that against. See services/asr.py.
     provider = asr.provider_for(config.server_asr)
+    # The phones this item is testing are held to a stricter standard than
+    # the rest of the word; see PipelineConfig.focus_phone_rule.
+    focus = exercises.focus_phones_for(item.target_feature)
     if sentence:
         result = score_sentence(
             sentence, spoken_target, waveform, sample_rate, get_model(), config,
-            transcript=transcript, transcript_provider=provider,
+            transcript=transcript, transcript_provider=provider, focus_phones=focus,
         )
     else:
         result = score_attempt(
             spoken_target, waveform, sample_rate, get_model(), config,
-            transcript=transcript, transcript_provider=provider,
+            transcript=transcript, transcript_provider=provider, focus_phones=focus,
         )
 
     gated = result.verdict in ("gated", "unscorable")

@@ -411,6 +411,25 @@ perception-item audio needs somewhere to be recorded.
   contrasts the study measures, so a rescue there is not evidence the
   contrast was produced. No threshold was moved: that waits for the audit
   to say so on more than a handful of clips.
+- Focus-phone rule. **2026-10-01.** Two attempts in the researcher's own
+  session passed and should not have: "bit" said as "bite" (IH 0.58,
+  decode B AY) came out 0.74 under worst_k=2 and was praised; "rice" said
+  as "lice" (R 0.60, decode L AY S) likewise. A minimal pair differs in one
+  phone by definition, so an aggregate over the word is the wrong
+  instrument for the contrast the item tests. The scorer now holds an
+  item's target-feature phones (`exercises.FEATURE_PHONES`) to the verdict
+  threshold on their own: substituted or deleted by the decode AND scored
+  below 0.60 fails the attempt, and the transcript rescue is refused over
+  such a phone, since Whisper restores exactly these contrasts. Feedback
+  names the failed phone even when it scored above the nameable ceiling,
+  so D says "I heard bite. The word is bit. The sound to fix is ...".
+  Items without a target feature are untouched; `focus_phone_rule=False`
+  restores the 09-25 behaviour exactly. Replayed on the stored per-phone
+  data since 09-17 it rejects 20 of 98 "correct" verdicts on feature
+  items, including both above and all seven rescues that had overridden a
+  target phone; those 20 are in the review task under `focus_phone` so the
+  researcher's ear, not the simulation, decides whether the cost in false
+  rejections is real.
 - Stored verdicts re-scored. `scripts/rescore_sessions.py` now scores
   read-aloud items as the server does (`--apply` writes back, backing the
   touched columns up to a JSON file that `--restore` reads). Every

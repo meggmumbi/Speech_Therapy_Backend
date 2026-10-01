@@ -145,6 +145,28 @@ class PipelineConfig:
     # production supports nearly all.
     transcript_rescue_min_phone_fraction: float = 0.5
 
+    # Hold the phones an item is testing to the verdict threshold on their
+    # own, not only through the worst-k aggregate.
+    #
+    # On 2026-10-01 "bit" said as "bite" passed: IH scored 0.58, below the
+    # 0.60 line, but worst_k=2 averaged it with a 0.90 and the word came out
+    # 0.74. "rice" said as "lice" passed the same way (R 0.60 against AY
+    # 0.91). The free decode had reported the substitution in both. A minimal
+    # pair differs in one phone by definition, so an aggregate over the word
+    # is exactly the wrong instrument for the contrast the item exists to
+    # test. With this on, an item's target-feature phones (exercises
+    # .FEATURE_PHONES) fail the attempt when they score below `correct` AND
+    # the decode substituted or deleted them, and the transcript rescue is
+    # refused over such a phone, because Whisper restores exactly these
+    # contrasts ("tree" -> "three") and so cannot vouch for them.
+    #
+    # Replaying the stored per-phone data from 2026-09-17 to 10-01 rejects
+    # 20 of the 98 "correct" verdicts on feature items; the two false
+    # accepts above are among them, as are all seven transcript rescues
+    # that had overridden a target-feature phone. Items with no target
+    # feature are untouched. Off, the 2026-09-25 behaviour returns exactly.
+    focus_phone_rule: bool = True
+
     sample_rate: int = 16_000
     # wav2vec2 emits one frame per 20 ms of audio at 16 kHz.
     frame_stride_s: float = 0.02

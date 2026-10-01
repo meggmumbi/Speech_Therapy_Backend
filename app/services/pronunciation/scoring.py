@@ -30,7 +30,7 @@ import logging
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Callable, Iterator, Literal, Sequence
+from typing import Callable, Collection, Iterator, Literal, Sequence
 
 import numpy as np
 
@@ -110,6 +110,10 @@ class AttemptScore:
     reference_needs_review: bool = False  # true when the target is a g2p prediction
     transcript: str | None = None         # ASR transcript, when the client sent one
     transcript_matches: bool | None = None
+    # Target-feature phones that failed the stricter standard; see
+    # PipelineConfig.focus_phone_rule. Non-empty means not correct, whatever
+    # the aggregate said, and feedback names the first of these.
+    focus_errors: tuple[PhoneDiagnosis, ...] = ()
 
 
 def _gated(word: str, verdict: Verdict, note: str, confidence: float,
@@ -253,6 +257,29 @@ def _corroborated_errors(diagnoses: Sequence[PhoneDiagnosis],
     ]
 
 
+def _focus_errors(diagnoses: Sequence[PhoneDiagnosis],
+                  focus_phones: Collection[str] | None,
+                  ceiling: float) -> list[PhoneDiagnosis]:
+    """Substitutions or deletions of a phone the item is testing, scored
+    below ``ceiling`` (the verdict threshold, not the looser phone_error).
+
+    Two signals still have to agree, as everywhere in this module: the
+    decode must have heard something else there AND the forced alignment
+    must have scored the expected phone below the line. A focus phone the
+    decode matched is never failed on its score alone, and a phone the
+    decode slipped on but the acoustics were sure of is not failed either.
+    """
+    if not focus_phones:
+        return []
+    focus = {strip_stress(p) for p in focus_phones}
+    return [
+        d for d in diagnoses
+        if d.kind in ("substitution", "deletion")
+        and strip_stress(d.expected) in focus
+        and d.score < ceiling
+    ]
+
+
 def transcript_matches_target(transcript: str | None, target: str,
                               reference: Reference | None) -> bool | None:
     """Did the client's ASR hear the target word?
@@ -300,8 +327,14 @@ def _classify(
     config: PipelineConfig,
     transcript_match: bool | None = None,
     phone_scores: Sequence[PhoneScore] = (),
+    focus_errors: Sequence[PhoneDiagnosis] = (),
 ) -> Verdict:
     """Decide the verdict from the acoustic evidence, with an ASR safety net.
+
+    ``focus_errors`` are failures on the phones the item is testing (see
+    :func:`_focus_errors`). Any one of them makes the attempt not correct and
+    closes the transcript rescue: the recogniser's word identity cannot vouch
+    for a contrast its language model restores on its own.
 
     The acoustic path decides on its own merits first. A matching ASR
     transcript can then *rescue* an attempt the acoustics called wrong, but a
@@ -325,7 +358,7 @@ def _classify(
     # own -- see PipelineConfig.stress_can_fail_verdict for why it is not yet.
     stress_counts = config.stress_can_fail_verdict
 
-    if score >= t.correct and not segmental_errors:
+    if score >= t.correct and not segmental_errors and not focus_errors:
         # Correct segmentally. A stress error would still make the word wrong,
         # but only if the detector can be trusted to have found one.
         if stress_counts and stress is not None and stress.is_error:
@@ -339,7 +372,8 @@ def _classify(
         ) / len(phone_scores)
 
     if (config.trust_transcript and transcript_match
-            and supported >= config.transcript_rescue_min_phone_fraction):
+            and supported >= config.transcript_rescue_min_phone_fraction
+            and not focus_errors):
         # The recogniser heard the target word and the audio supports most of
         # its phones: do not call this wrong.
         if stress_counts and stress is not None and stress.is_error:
@@ -369,8 +403,12 @@ def score_attempt(
     config: PipelineConfig = DEFAULT_CONFIG,
     transcript: str | None = None,
     transcript_provider: TranscriptProvider | None = None,
+    focus_phones: Collection[str] | None = None,
 ) -> AttemptScore:
     """Score one spoken attempt at ``word``.
+
+    ``focus_phones`` are the phones the item is testing, held to the
+    stricter standard described at ``PipelineConfig.focus_phone_rule``.
 
     ``waveform`` is mono float32 in ``[-1, 1]`` at ``sample_rate``. Decoding and
     resampling belong to the transport layer, not here, so that this function
@@ -401,7 +439,8 @@ def score_attempt(
     return score_phone_sequence(target, reference.variants, waveform,
                                 sample_rate, model, config, timings,
                                 reference=reference, transcript=transcript,
-                                transcript_provider=transcript_provider)
+                                transcript_provider=transcript_provider,
+                                focus_phones=focus_phones)
 
 
 def score_phone_sequence(
@@ -417,6 +456,7 @@ def score_phone_sequence(
     transcript_provider: TranscriptProvider | None = None,
     context: tuple[Sequence[Sequence[str]], Sequence[Sequence[str]]] | None = None,
     max_seconds: float | None = None,
+    focus_phones: Collection[str] | None = None,
 ) -> AttemptScore:
     """Score audio against an explicit set of accepted phone sequences.
 
@@ -563,10 +603,13 @@ def score_phone_sequence(
             quantile=config.verdict_quantile, k=config.verdict_worst_k,
         )
         diagnoses = _diagnose(phone_scores, ops, config)
+        focus_errors = (_focus_errors(diagnoses, focus_phones, config.thresholds.correct)
+                        if config.focus_phone_rule else [])
         heard_target = transcript_matches_target(transcript, target, reference)
         verdict = _classify(verdict_score, diagnoses, stress, config,
                             transcript_match=heard_target,
-                            phone_scores=phone_scores)
+                            phone_scores=phone_scores,
+                            focus_errors=focus_errors)
 
     if (verdict != "correct" and transcript is None
             and transcript_provider is not None):
@@ -583,7 +626,8 @@ def score_phone_sequence(
             heard_target = transcript_matches_target(transcript, target, reference)
             verdict = _classify(verdict_score, diagnoses, stress, config,
                                 transcript_match=heard_target,
-                                phone_scores=phone_scores)
+                                phone_scores=phone_scores,
+                                focus_errors=focus_errors)
 
     return AttemptScore(
         word=target,
@@ -606,6 +650,7 @@ def score_phone_sequence(
         transcript_matches=heard_target,
         timings=timings,
         provenance=config.provenance(),
+        focus_errors=tuple(focus_errors),
     )
 
 
@@ -618,6 +663,7 @@ def score_sentence(
     config: PipelineConfig = DEFAULT_CONFIG,
     transcript: str | None = None,
     transcript_provider: TranscriptProvider | None = None,
+    focus_phones: Collection[str] | None = None,
 ) -> AttemptScore:
     """Score one word read inside a carrier sentence.
 
@@ -661,4 +707,5 @@ def score_sentence(
         transcript_provider=transcript_provider,
         context=(leading, trailing),
         max_seconds=config.max_sentence_seconds,
+        focus_phones=focus_phones,
     )

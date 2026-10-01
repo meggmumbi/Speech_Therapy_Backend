@@ -152,27 +152,45 @@ class TargetFeature:
     label: str
     contrast: str
     example: str
+    #: The ARPAbet phones the feature is a contrast between. The scorer holds
+    #: these to a stricter standard than the rest of the word: a minimal pair
+    #: differs in exactly one of them, so an aggregate over the whole word
+    #: cannot see the difference the item exists to test. Empty for stress,
+    #: which is not a phone.
+    phones: frozenset[str] = frozenset()
 
 
 FEATURES: tuple[TargetFeature, ...] = (
     TargetFeature("trap_palm_strut", "TRAP / PALM / STRUT",
-                  "/ae/ vs /aa/ vs /ah/, commonly merged", "cat / cart / cut"),
+                  "/ae/ vs /aa/ vs /ah/, commonly merged", "cat / cart / cut",
+                  frozenset({"AE", "AA", "AH"})),
     TargetFeature("kit_fleece", "KIT / FLEECE",
-                  "/ih/ vs /iy/, length and quality", "ship / sheep"),
+                  "/ih/ vs /iy/, length and quality", "ship / sheep",
+                  frozenset({"IH", "IY"})),
     TargetFeature("foot_goose", "FOOT / GOOSE",
-                  "/uh/ vs /uw/", "pull / pool"),
+                  "/uh/ vs /uw/", "pull / pool",
+                  frozenset({"UH", "UW"})),
     TargetFeature("schwa_reduction", "Schwa and reduction",
-                  "unstressed vowels produced in full", "banana, about"),
+                  "unstressed vowels produced in full", "banana, about",
+                  frozenset({"AH"})),
     TargetFeature("dental_fricative", "Dental fricatives",
-                  "/th/ and /dh/ realised as /t/ and /d/", "think / tink"),
+                  "/th/ and /dh/ realised as /t/ and /d/", "think / tink",
+                  frozenset({"TH", "DH"})),
     TargetFeature("polysyllabic_stress", "Polysyllabic stress",
                   "primary stress placement", "photograph / photography"),
     TargetFeature("rhotic_lateral", "Tapped /r/",
-                  "tapped /r/ perceived as /l/", "rot / lot"),
+                  "tapped /r/ perceived as /l/", "rot / lot",
+                  frozenset({"R", "L"})),
 )
 
 FEATURES_BY_KEY: dict[str, TargetFeature] = {f.key: f for f in FEATURES}
 TARGET_FEATURES: tuple[str, ...] = tuple(f.key for f in FEATURES)
+FEATURE_PHONES: dict[str, frozenset[str]] = {f.key: f.phones for f in FEATURES}
+
+
+def focus_phones_for(feature: str | None) -> frozenset[str]:
+    """The phones the scorer must not wave through for an item on ``feature``."""
+    return FEATURE_PHONES.get(feature or "", frozenset())
 
 
 #: Which letters of a word carry the feature being taught, so the tablet can

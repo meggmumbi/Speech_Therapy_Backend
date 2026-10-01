@@ -176,6 +176,9 @@ def _review_candidates(db: Session) -> list[tuple[models.SessionActivity, str]]:
     heard_but_rejected: the transcript contained the target and the verdict
         was still incorrect or close. Either the transcript was generous or
         the verdict was a false rejection, and only an ear can say which.
+    focus_phone: stored as correct before the focus-phone rule (2026-10-01),
+        but the stored per-phone data shows the item's own target phone
+        substituted or deleted below the line. Scored today it would not pass.
     close: the verdict itself says the evidence was marginal.
     borderline: correct on the acoustics alone but within 0.05 of the line.
     """
@@ -201,6 +204,8 @@ def _review_candidates(db: Session) -> list[tuple[models.SessionActivity, str]]:
         heard = bool(a.transcript_matches) or bool(transcript_matches_target(a.transcript, normalize_text(target), None))
         if a.verdict == "correct" and heard and score < t.correct:
             reason = "rescued"
+        elif a.verdict == "correct" and _stored_focus_error(a, item.target_feature, t.correct):
+            reason = "focus_phone"
         elif a.verdict in ("incorrect", "close", "stress_error") and heard:
             reason = "heard_but_rejected"
         elif a.verdict == "close":
@@ -211,6 +216,19 @@ def _review_candidates(db: Session) -> list[tuple[models.SessionActivity, str]]:
             continue
         out.append((a, reason))
     return out
+
+
+def _stored_focus_error(a: models.SessionActivity, feature: str | None, ceiling: float) -> bool:
+    """scoring._focus_errors, replayed from the JSON a stored attempt holds."""
+    focus = exercises.focus_phones_for(feature)
+    if not focus:
+        return False
+    for d in (a.diagnoses or []):
+        if d.get("kind") not in ("substitution", "deletion"):
+            continue
+        if str(d.get("expected") or "").rstrip("012") in focus and float(d.get("score") or 0.0) < ceiling:
+            return True
+    return False
 
 
 # --- the queue --------------------------------------------------------------

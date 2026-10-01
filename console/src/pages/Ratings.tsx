@@ -7,6 +7,7 @@ import { ratings, type Task } from "../api/ratings";
 
 const REASONS: Record<string, string> = {
   rescued: "Transcript rescued it",
+  focus_phone: "Passed with its target sound wrong",
   heard_but_rejected: "Heard, yet rejected",
   close: "Called close",
   borderline: "Correct, near the line",
