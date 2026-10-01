@@ -62,3 +62,6 @@ stimulus_audio/
 
 # scripts/rescore_sessions.py --apply writes the previous values here
 rescore_backup_*.json
+
+# Word lock files
+~$*.docx
