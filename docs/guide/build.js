@@ -40,8 +40,8 @@ const gap = () => new Paragraph({ spacing: { after: 200 }, children: [] });
 const children = [
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 2400, after: 200 }, children: [new TextRun({ text: "Pepper Pronunciation Tutor", bold: true, size: 56 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: "System guide", size: 36 })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: "Parts 1 and 2: how the system is built, and the data it collects", size: 24, color: "555555" })] }),
-  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: "Parts 3 and 4 (the analysis, the interpretation) follow in later revisions of this document.", size: 20, color: "777777" })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: "Parts 1 to 3: how the system is built, the data it collects, and how they will be analysed", size: 24, color: "555555" })] }),
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: "Part 4 (the interpretation of findings) follows in a later revision of this document.", size: 20, color: "777777" })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [new TextRun({ text: "1 October 2026", size: 22, color: "555555" })] }),
   new Paragraph({ children: [new PageBreak()] }),
 
@@ -137,6 +137,7 @@ const children = [
 
 const data = JSON.parse(fs.readFileSync(path.join(here, "part2.json"), "utf8"));
 children.push(...require("./part2.js")({ P, H1, H2, B, I, C, bullet, step, table, gap, caption, img, TextRun, Paragraph, PageBreak, data }));
+children.push(...require("./part3.js")({ P, H1, H2, B, I, C, bullet, step, table, gap, caption, img, TextRun, Paragraph, PageBreak }));
 
 const doc = new Document({
   features: { updateFields: true },
@@ -153,6 +154,7 @@ const doc = new Document({
     config: [
       { reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] },
       { reference: "steps", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] },
+      { reference: "steps3", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] },
     ],
   },
   sections: [{ properties: { page: { margin: { top: 1300, bottom: 1300, left: 1300, right: 1300 } } }, children }],

@@ -25,3 +25,4 @@ truststore~=0.10
 # passlib 1.7.4 reads bcrypt.__about__, removed in bcrypt 4.1+. The error is
 # trapped and login still works, but the traceback on every start is noise.
 bcrypt<4.1
+statsmodels~=0.15

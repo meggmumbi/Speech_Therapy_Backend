@@ -65,3 +65,6 @@ rescore_backup_*.json
 
 # Word lock files
 ~$*.docx
+
+# analysis exports (participant-level data; regenerate with scripts/analysis/export_analysis.py)
+/analysis/
