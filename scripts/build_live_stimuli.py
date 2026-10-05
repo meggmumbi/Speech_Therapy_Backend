@@ -43,7 +43,11 @@ contrasts Kenyan English does not typically neutralise, and its stress,
 syllable-count and schwa tasks are the suprasegmental material this protocol
 sets aside.
 
-The spoken words of a feature share a vowel or consonant class, not a
+Advanced vocabulary. The participants are undergraduates who self-rate at
+B2 to C2; the first draft ("cat", "ship", "pull") was too easy to show
+anything about them. Every word now is low-frequency or polysyllabic, with
+the contrast in a stressed syllable and a true minimal pair for each hear
+item. The spoken words of a feature share a vowel or consonant class, not a
 frequency count; the features are matched A to B slot for slot, and the
 import check (GET /authoring/item-sets/validate) is the arbiter.
 """
@@ -61,30 +65,44 @@ sys.path.insert(0, str(ROOT))
 
 # feature -> per list: say (with its minimal-pair partner), say2, sentence; novel
 LIVE: dict[str, dict] = {
+    # Advanced vocabulary throughout: the participants are undergraduates
+    # who self-rate at B2 to C2, and a list of "cat" and "ship" measures
+    # nothing about them. The contrast still sits in a stressed syllable
+    # and every hear item is still a true minimal pair.
     "trap_palm_strut": {
-        "a": {"say": ("cat", "cut"), "say2": "cup", "sentence": "The cat is under the table."},
-        "b": {"say": ("bag", "bug"), "say2": "bus", "sentence": "She put the bag on the chair."},
-        "novel": "map",
+        "a": {"say": ("paddle", "puddle"), "say2": "analysis",
+              "sentence": "The children paddle in the shallow lake."},
+        "b": {"say": ("mastered", "mustard"), "say2": "substantial",
+              "sentence": "She mastered the technique in a week."},
+        "novel": "capacity",
     },
     "kit_fleece": {
-        "a": {"say": ("ship", "sheep"), "say2": "sit", "sentence": "The ship is leaving the port."},
-        "b": {"say": ("hit", "heat"), "say2": "lip", "sentence": "He hit the ball with the bat."},
-        "novel": "chip",
+        "a": {"say": ("litter", "litre"), "say2": "statistical",
+              "sentence": "Please put the litter in the bin."},
+        "b": {"say": ("filling", "feeling"), "say2": "discipline",
+              "sentence": "The pie has a sweet filling."},
+        "novel": "significant",
     },
     "foot_goose": {
-        "a": {"say": ("pull", "pool"), "say2": "book", "sentence": "Please pull the door open."},
-        "b": {"say": ("full", "fool"), "say2": "good", "sentence": "The glass is full of water."},
-        "novel": "foot",
+        "a": {"say": ("pulling", "pooling"), "say2": "bulletin",
+              "sentence": "The team is pulling in the same direction."},
+        "b": {"say": ("cookie", "kooky"), "say2": "unusual",
+              "sentence": "The cookie was still warm."},
+        "novel": "cushion",
     },
     "dental_fricative": {
-        "a": {"say": ("think", "sink"), "say2": "bath", "sentence": "I think the answer is here."},
-        "b": {"say": ("thin", "tin"), "say2": "mouth", "sentence": "This book is thin."},
-        "novel": "thumb",
+        "a": {"say": ("thinker", "tinker"), "say2": "hypothesis",
+              "sentence": "She is a careful thinker."},
+        "b": {"say": ("worthy", "wordy"), "say2": "methodology",
+              "sentence": "The cause is worthy of support."},
+        "novel": "authentic",
     },
     "rhotic_lateral": {
-        "a": {"say": ("right", "light"), "say2": "alive", "sentence": "Turn right at the next corner."},
-        "b": {"say": ("rice", "lice"), "say2": "arrive", "sentence": "We cooked rice for dinner."},
-        "novel": "road",
+        "a": {"say": ("correct", "collect"), "say2": "parallel",
+              "sentence": "Please correct the mistakes in the essay."},
+        "b": {"say": ("arrive", "alive"), "say2": "relevant",
+              "sentence": "The train will arrive at noon."},
+        "novel": "liberal",
     },
 }
 
@@ -186,7 +204,10 @@ def check() -> list[str]:
             if ref is None:
                 problems.append(f"{feature}: {word!r} has no reference pronunciation")
                 continue
-            phones = {p.rstrip("012") for form in ref.variants for p in form}
+            # Canonical form only: the realisation variants include a
+            # linking /r/ ("litter" before a vowel), which is not the
+            # tapped-/r/ problem and must not disqualify the word.
+            phones = {p.rstrip("012") for p in ref.variants[0]}
             if said and focus and not (phones & set(focus)):
                 problems.append(f"{feature}: {word!r} does not contain {sorted(focus)}")
             if feature != "rhotic_lateral" and "R" in phones:

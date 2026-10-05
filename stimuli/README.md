@@ -24,11 +24,17 @@ novel word per feature, spoken only.
 
 | Feature | A: say / say2 / hear | B: say / say2 / hear | Novel |
 |---|---|---|---|
-| TRAP/PALM/STRUT | cat / cup / cat–cut | bag / bus / bag–bug | map |
-| KIT/FLEECE | ship / sit / ship–sheep | hit / lip / hit–heat | chip |
-| FOOT/GOOSE | pull / book / pull–pool | full / good / full–fool | foot |
-| Dental fricatives | think / bath / think–sink | thin / mouth / thin–tin | thumb |
-| Tapped /r/ | right / alive / right–light | rice / arrive / rice–lice | road |
+| TRAP/PALM/STRUT | paddle / analysis / paddle–puddle | mastered / substantial / mastered–mustard | capacity |
+| KIT/FLEECE | litter / statistical / litter–litre | filling / discipline / filling–feeling | significant |
+| FOOT/GOOSE | pulling / bulletin / pulling–pooling | cookie / unusual / cookie–kooky | cushion |
+| Dental fricatives | thinker / hypothesis / thinker–tinker | worthy / methodology / worthy–wordy | authentic |
+| Tapped /r/ | correct / parallel / correct–collect | arrive / relevant / arrive–alive | liberal |
+
+The vocabulary is advanced on purpose: the participants are undergraduates
+who self-rate at B2 to C2, and the contrast sits in a stressed syllable of a
+low-frequency or polysyllabic word. Longer words carry more phones for the
+worst-two-phone verdict to trip on, so the audit's false-rejection rate per
+feature matters more with these lists than with the pilot ones.
 
 Why five and not seven, why four and not three, and why no `/r/` appears in
 any non-rhotic word, is written at the top of `scripts/build_live_stimuli.py`.

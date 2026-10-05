@@ -3,7 +3,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "cat"
+        "word": "paddle"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-say"
@@ -11,7 +11,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "cup"
+        "word": "analysis"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-say2"
@@ -19,8 +19,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "The cat is under the table.",
-        "target_word": "cat"
+        "sentence": "The children paddle in the shallow lake.",
+        "target_word": "paddle"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-sentence"
@@ -29,10 +29,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "cat",
-          "cut"
+          "paddle",
+          "puddle"
         ],
-        "answer": "cat"
+        "answer": "paddle"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-hear"
@@ -40,7 +40,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "ship"
+        "word": "litter"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-say"
@@ -48,7 +48,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "sit"
+        "word": "statistical"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-say2"
@@ -56,8 +56,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "The ship is leaving the port.",
-        "target_word": "ship"
+        "sentence": "Please put the litter in the bin.",
+        "target_word": "litter"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-sentence"
@@ -66,10 +66,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "ship",
-          "sheep"
+          "litter",
+          "litre"
         ],
-        "answer": "ship"
+        "answer": "litter"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-hear"
@@ -77,7 +77,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "pull"
+        "word": "pulling"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-say"
@@ -85,7 +85,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "book"
+        "word": "bulletin"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-say2"
@@ -93,8 +93,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "Please pull the door open.",
-        "target_word": "pull"
+        "sentence": "The team is pulling in the same direction.",
+        "target_word": "pulling"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-sentence"
@@ -103,10 +103,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "pull",
-          "pool"
+          "pulling",
+          "pooling"
         ],
-        "answer": "pull"
+        "answer": "pulling"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-hear"
@@ -114,7 +114,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "think"
+        "word": "thinker"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-say"
@@ -122,7 +122,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "bath"
+        "word": "hypothesis"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-say2"
@@ -130,8 +130,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "I think the answer is here.",
-        "target_word": "think"
+        "sentence": "She is a careful thinker.",
+        "target_word": "thinker"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-sentence"
@@ -140,10 +140,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "think",
-          "sink"
+          "thinker",
+          "tinker"
         ],
-        "answer": "think"
+        "answer": "thinker"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-hear"
@@ -151,7 +151,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "right"
+        "word": "correct"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-say"
@@ -159,7 +159,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "alive"
+        "word": "parallel"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-say2"
@@ -167,8 +167,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "Turn right at the next corner.",
-        "target_word": "right"
+        "sentence": "Please correct the mistakes in the essay.",
+        "target_word": "correct"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-sentence"
@@ -177,10 +177,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "right",
-          "light"
+          "correct",
+          "collect"
         ],
-        "answer": "right"
+        "answer": "correct"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-hear"

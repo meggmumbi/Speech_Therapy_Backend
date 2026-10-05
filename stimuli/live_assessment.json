@@ -3,7 +3,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "cat"
+        "word": "paddle"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-a"
@@ -11,7 +11,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "bag"
+        "word": "mastered"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-b"
@@ -19,7 +19,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "map"
+        "word": "capacity"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-novel"
@@ -27,7 +27,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "ship"
+        "word": "litter"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-a"
@@ -35,7 +35,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "hit"
+        "word": "filling"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-b"
@@ -43,7 +43,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "chip"
+        "word": "significant"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-novel"
@@ -51,7 +51,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "pull"
+        "word": "pulling"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-a"
@@ -59,7 +59,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "full"
+        "word": "cookie"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-b"
@@ -67,7 +67,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "foot"
+        "word": "cushion"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-novel"
@@ -75,7 +75,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "think"
+        "word": "thinker"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-a"
@@ -83,7 +83,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "thin"
+        "word": "worthy"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-b"
@@ -91,7 +91,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "thumb"
+        "word": "authentic"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-novel"
@@ -99,7 +99,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "right"
+        "word": "correct"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-a"
@@ -107,7 +107,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "rice"
+        "word": "arrive"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-b"
@@ -115,7 +115,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "road"
+        "word": "liberal"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-novel"

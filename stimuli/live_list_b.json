@@ -3,7 +3,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "bag"
+        "word": "mastered"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-say"
@@ -11,7 +11,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "bus"
+        "word": "substantial"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-say2"
@@ -19,8 +19,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "She put the bag on the chair.",
-        "target_word": "bag"
+        "sentence": "She mastered the technique in a week.",
+        "target_word": "mastered"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-sentence"
@@ -29,10 +29,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "bag",
-          "bug"
+          "mastered",
+          "mustard"
         ],
-        "answer": "bag"
+        "answer": "mastered"
       },
       "target_feature": "trap_palm_strut",
       "match_key": "trap_palm_strut-hear"
@@ -40,7 +40,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "hit"
+        "word": "filling"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-say"
@@ -48,7 +48,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "lip"
+        "word": "discipline"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-say2"
@@ -56,8 +56,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "He hit the ball with the bat.",
-        "target_word": "hit"
+        "sentence": "The pie has a sweet filling.",
+        "target_word": "filling"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-sentence"
@@ -66,10 +66,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "hit",
-          "heat"
+          "filling",
+          "feeling"
         ],
-        "answer": "hit"
+        "answer": "filling"
       },
       "target_feature": "kit_fleece",
       "match_key": "kit_fleece-hear"
@@ -77,7 +77,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "full"
+        "word": "cookie"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-say"
@@ -85,7 +85,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "good"
+        "word": "unusual"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-say2"
@@ -93,8 +93,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "The glass is full of water.",
-        "target_word": "full"
+        "sentence": "The cookie was still warm.",
+        "target_word": "cookie"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-sentence"
@@ -103,10 +103,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "full",
-          "fool"
+          "cookie",
+          "kooky"
         ],
-        "answer": "full"
+        "answer": "cookie"
       },
       "target_feature": "foot_goose",
       "match_key": "foot_goose-hear"
@@ -114,7 +114,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "thin"
+        "word": "worthy"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-say"
@@ -122,7 +122,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "mouth"
+        "word": "methodology"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-say2"
@@ -130,8 +130,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "This book is thin.",
-        "target_word": "thin"
+        "sentence": "The cause is worthy of support.",
+        "target_word": "worthy"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-sentence"
@@ -140,10 +140,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "thin",
-          "tin"
+          "worthy",
+          "wordy"
         ],
-        "answer": "thin"
+        "answer": "worthy"
       },
       "target_feature": "dental_fricative",
       "match_key": "dental_fricative-hear"
@@ -151,7 +151,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "rice"
+        "word": "arrive"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-say"
@@ -159,7 +159,7 @@
     {
       "exercise_type": "repeat_word",
       "spec": {
-        "word": "arrive"
+        "word": "relevant"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-say2"
@@ -167,8 +167,8 @@
     {
       "exercise_type": "read_sentence",
       "spec": {
-        "sentence": "We cooked rice for dinner.",
-        "target_word": "rice"
+        "sentence": "The train will arrive at noon.",
+        "target_word": "arrive"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-sentence"
@@ -177,10 +177,10 @@
       "exercise_type": "minimal_pair_id",
       "spec": {
         "options": [
-          "rice",
-          "lice"
+          "arrive",
+          "alive"
         ],
-        "answer": "rice"
+        "answer": "arrive"
       },
       "target_feature": "rhotic_lateral",
       "match_key": "rhotic_lateral-hear"
