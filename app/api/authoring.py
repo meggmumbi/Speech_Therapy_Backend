@@ -71,6 +71,12 @@ class ListImport(BaseModel):
 class StudyRoleRequest(BaseModel):
     #: list_a | list_b | test, or null to unbind.
     study_role: str | None
+    #: Take the role from a category that has sessions recorded against it.
+    #: That category keeps the role as `retired_study_role`, so its sessions
+    #: still export with their list label; it is simply no longer the list
+    #: new sessions are built from. Off by default: handing the live study's
+    #: list over by accident mid-study must not be one click.
+    retire_previous: bool = False
 
 
 # --- import -----------------------------------------------------------------
@@ -306,6 +312,7 @@ def list_categories(db: Session = Depends(get_db)):
             "name": category.name,
             "description": category.description,
             "study_role": category.study_role,
+            "retired_study_role": category.retired_study_role,
             "difficulty_level": category.difficulty_level,
             "item_count": len(item_ids),
             "items_with_attempts": len(attempted),
@@ -597,16 +604,23 @@ def set_study_role(
         )
         if holder:
             if _category_has_sessions(db, holder.id):
-                raise HTTPException(
-                    409,
-                    f"{holder.name!r} is already bound as {role} and has "
-                    f"sessions recorded against it. Moving the role would "
-                    f"change what those sessions were."
-                )
+                if not request.retire_previous:
+                    raise HTTPException(
+                        409,
+                        f"{holder.name!r} is already bound as {role} and has "
+                        f"sessions recorded against it. Moving the role would "
+                        f"change what those sessions were. Send "
+                        f"retire_previous=true to hand the role over: the old "
+                        f"list keeps it as a retired role, so its sessions "
+                        f"stay labelled, and new sessions use this list."
+                    )
+                holder.retired_study_role = role
             holder.study_role = None
             db.flush()
 
     category.study_role = role
+    if role is not None and category.retired_study_role == role:
+        category.retired_study_role = None
     db.commit()
     db.refresh(category)
     return {

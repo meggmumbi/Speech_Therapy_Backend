@@ -449,6 +449,44 @@ perception-item audio needs somewhere to be recorded.
   word alone; the dry run over 148 attempts since 09-17 flips 44 verdicts to
   correct and none to wrong. Until `--apply` is run the summaries and the
   dashboard read those 44 as errors the participant did not make.
+- **The revisit round. Done 2026-10-05.** The assessments present only the
+  test set and every feature is trained under both conditions, so a
+  pre-to-post gain could never be attributed to K or D. Now, when the main
+  round of a training block ends, every spoken item the participant was
+  corrected on comes back once, under the same condition, one attempt and no
+  retry (`GET /study/sessions/{id}/revisits` picks them from the stored
+  attempts; the tablet sends `revisit=true` on the attempt; the row carries
+  `session_activities.revisit`). Items repaired on attempt two and items not
+  repaired both come back, because "did the correction hold" is the question
+  for both; skipped and tapped items do not. The export carries the column,
+  `is_first`/`is_final` are main-round only, and the analysis adds M2b
+  (`correct ~ D + repaired`, revisit rows) beside M2. Simulated power at
+  N = 40 under the same OR 2.0 assumption: 87%. Run
+  `python scripts/update_database.py` for the column.
+- **Attention per item phase. Done 2026-10-05**, exploratory. The gaze
+  manager already summarised a whole session in one row; it now also keeps
+  one segment per (item, phase: prompt / response / feedback), each a count
+  of 500 ms samples with the person detected, how many of those the engine
+  classed as attending, and a histogram of its attention labels.
+  Derived states only; no image, geometry, age or gender estimate leaves
+  the robot. Uploaded once at session end to
+  `POST /study/sessions/{id}/attention` (table `attention_segments`),
+  exported as `attention.csv`, and reported by the analysis as a
+  description by condition and phase, never as a model.
+- **Live stimulus lists. 2026-10-05.** `scripts/build_live_stimuli.py` writes
+  `stimuli/live_*.json`: five segmental features, four items each (two spoken
+  words, a sentence, a perception item), assessment of fifteen spoken words.
+  Schwa and stress are out of the live protocol: the scorer cannot fail a
+  stress error (no focus phones; `stress_error` sits beside the verdict, not
+  in it) and scores a full vowel for schwa leniently, so neither feature can
+  trigger the feedback manipulation, and a feature on which the manipulation
+  cannot fire adds session time and no observations of the primary outcome.
+  No non-rhotic word contains /r/, because P1's tapped /r/ scored below
+  threshold and the verdict reads the worst two phones of the word.
+  Handing the study roles from the pilot lists to the live ones: the pilot
+  lists have sessions recorded against them, so `PUT .../study-role` now
+  takes `retire_previous=true` (the console asks), the pilot list keeps the
+  label as `retired_study_role`, and its sessions still export with it.
 - Two or three trained raters, ICC / Fleiss kappa reported, adjudication path.
 - Analysis in linear mixed-effects models with participant, item and rater as
   random effects, effect sizes against Plonsky & Oswald benchmarks. This is the

@@ -7,6 +7,8 @@ export interface Category {
   name: string;
   description: string | null;
   study_role: "list_a" | "list_b" | "test" | null;
+  /** The role a newer list took over from this one; its sessions keep the label. */
+  retired_study_role?: "list_a" | "list_b" | "test" | null;
   difficulty_level: string | null;
   item_count: number;
   items_with_attempts: number;
@@ -90,9 +92,9 @@ export const stimuli = {
   categories: () => api<Category[]>("authoring/categories"),
   createCategory: (name: string, study_role: string | null) =>
     api<Category>("authoring/categories", { method: "POST", json: { name, study_role } }),
-  setRole: (categoryId: string, study_role: string | null) =>
+  setRole: (categoryId: string, study_role: string | null, retire_previous = false) =>
     api<{ study_role: string | null }>(`authoring/categories/${categoryId}/study-role`, {
-      method: "PUT", json: { study_role },
+      method: "PUT", json: { study_role, retire_previous },
     }),
   items: (categoryId: string) =>
     api<{ category: { id: string; name: string; study_role: string | null }; items: Item[] }>(

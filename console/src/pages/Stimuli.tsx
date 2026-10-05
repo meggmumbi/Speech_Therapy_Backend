@@ -54,7 +54,26 @@ export function Stimuli() {
     onSuccess: () => { setEditing(null); setError(null); invalidate(); }, onError: fail,
   });
   const remove = useMutation({ mutationFn: (id: string) => stimuli.deleteItem(id), onSuccess: () => { setToDelete(null); invalidate(); }, onError: fail });
-  const setRole = useMutation({ mutationFn: ({ id, role }: { id: string; role: string | null }) => stimuli.setRole(id, role), onSuccess: invalidate, onError: fail });
+  const setRole = useMutation({
+    mutationFn: ({ id, role, retire }: { id: string; role: string | null; retire?: boolean }) => stimuli.setRole(id, role, retire),
+    onSuccess: invalidate,
+    onError: (e: unknown, vars) => {
+      // The role is held by a list with recorded sessions. Hand it over only
+      // on an explicit yes: the old list keeps the label as a retired role,
+      // so its sessions still export as that list; new sessions use this one.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!vars.retire && /retire_previous/.test(msg)) {
+        const holder = cats.data?.find((c) => c.study_role === vars.role && c.id !== vars.id);
+        if (window.confirm(`"${holder?.name ?? "Another list"}" is ${ROLE_LABEL[vars.role ?? ""] ?? vars.role} and has sessions recorded against it.
+
+Hand the role to this list? The old list keeps it as a retired role, so its sessions stay labelled; from now on new sessions use this list.`)) {
+          setRole.mutate({ ...vars, retire: true });
+          return;
+        }
+      }
+      fail(e);
+    },
+  });
   const createCat = useMutation({ mutationFn: (name: string) => stimuli.createCategory(name, null), onSuccess: (c) => { setNewList(false); setSelected(c.id); invalidate(); }, onError: fail });
   const doImport = useMutation({
     mutationFn: ({ apply }: { apply: boolean }) => stimuli.importItems(current!, pendingImport!, apply, replace),
@@ -219,6 +238,7 @@ function CategoryRow({ c, active, onClick }: { c: Category; active: boolean; onC
         secondary={<Stack direction="row" spacing={0.75} alignItems="center" component="span" sx={{ mt: 0.25 }}>
           <span>{c.item_count} items</span>
           {c.study_role && <Chip size="small" color={c.study_role === "test" ? "secondary" : "primary"} variant="outlined" label={ROLE_LABEL[c.study_role]} sx={{ height: 20 }} />}
+          {!c.study_role && c.retired_study_role && <Chip size="small" variant="outlined" label={`was ${ROLE_LABEL[c.retired_study_role]}`} sx={{ height: 20 }} />}
         </Stack>}
       />
     </ListItemButton>

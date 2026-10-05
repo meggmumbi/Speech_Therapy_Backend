@@ -9,6 +9,7 @@ Four files, one row per unit the analysis uses:
     sessions.csv        one per stamped session: type, condition, block, list
     attempts.csv        one per attempt in a stamped session, spoken or tapped
     questionnaires.csv  one per training block: the three scale means
+    attention.csv       one per (item, phase) of a session: Pepper's attention states
 
 Every column is either a stored value or a derivation stated in this file.
 No name, no email, no free text that could identify someone leaves the
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import sys
 from pathlib import Path
@@ -74,8 +76,10 @@ def main() -> int:
 
     # --- sessions -------------------------------------------------------------
     def list_of(s: TherapySession) -> str | None:
+        # A list that a newer one has replaced keeps its label as a retired
+        # role, so sessions run against it still say which list they were.
         c = categories.get(s.category_id)
-        return c.study_role if c else None
+        return (c.study_role or c.retired_study_role) if c else None
 
     with (out / "sessions.csv").open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
@@ -98,13 +102,17 @@ def main() -> int:
                 .filter(SessionActivity.session_id.in_(list(session_by_id)))
                 .order_by(SessionActivity.created_at).all()) if sessions else []
     # Final attempt per (session, item): the one the item's outcome is read from.
+    # The revisit round is excluded from both: a revisit is a later, separate
+    # measure of the same item (did the correction hold?), carried in its own
+    # column, not the main round's first or final attempt.
+    main = [a for a in attempts if not a.revisit]
     latest: dict[tuple, SessionActivity] = {}
-    for a in attempts:
+    for a in main:
         key = (a.session_id, a.item_id)
         if key not in latest or (a.attempt_number or 0) >= (latest[key].attempt_number or 0):
             latest[key] = a
     first: dict[tuple, SessionActivity] = {}
-    for a in attempts:
+    for a in main:
         key = (a.session_id, a.item_id)
         if key not in first or (a.attempt_number or 0) < (first[key].attempt_number or 0):
             first[key] = a
@@ -113,7 +121,7 @@ def main() -> int:
         w = csv.writer(fh)
         w.writerow(["attempt", "participant", "session", "session_type", "condition", "block", "list",
                     "item", "item_name", "exercise_type", "spoken", "target_feature", "match_key",
-                    "attempt_number", "is_first", "is_final", "correct", "verdict", "verdict_score",
+                    "attempt_number", "is_first", "is_final", "revisit", "correct", "verdict", "verdict_score",
                     "graded_score", "confidence", "gated", "skipped", "skip_reason", "transcript_matches",
                     "response_time_s", "prompt_replays", "slow_replay", "celebration", "feedback_words",
                     "named_phone", "audio_quality", "audio_peak", "audio_rms_dbfs", "config_hash", "recorded_at"])
@@ -126,7 +134,7 @@ def main() -> int:
             w.writerow([a.id, c.participant_code if c else None, s.id, s.session_type, s.condition, s.block_index,
                         list_of(s), a.item_id, it.name if it else None, etype, exercises.needs_asr(etype),
                         it.target_feature if it else None, it.match_key if it else None,
-                        a.attempt_number, first[key] is a, latest[key] is a,
+                        a.attempt_number, first.get(key) is a, latest.get(key) is a, bool(a.revisit),
                         None if (a.gated or a.skipped) else bool(a.is_correct), a.verdict, a.verdict_score,
                         a.pronunciation_score, a.confidence, bool(a.gated), bool(a.skipped), a.skip_reason,
                         a.transcript_matches, a.response_time_seconds, a.prompt_replays, a.slow_replay_used,
@@ -145,7 +153,27 @@ def main() -> int:
                         (sc.get("godspeed") or {}).get("mean"), (sc.get("motivation") or {}).get("mean"),
                         (sc.get("feedback_trust") or {}).get("mean"), q.duration_seconds, q.instrument_version])
 
-    print(f"{len(children)} participants, {len(sessions)} sessions, {len(attempts)} attempts -> {out}/")
+    # --- attention ----------------------------------------------------------------
+    from app.models.attention_segment import AttentionSegment
+    with (out / "attention.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["session", "participant", "session_type", "condition", "block", "item", "target_feature",
+                    "phase", "revisit", "started_at_ms", "ended_at_ms", "duration_ms", "samples",
+                    "attending_samples", "attending_fraction", "states"])
+        segments = (db.query(AttentionSegment)
+                    .filter(AttentionSegment.session_id.in_(list(session_by_id)))
+                    .order_by(AttentionSegment.started_at_ms).all()) if sessions else []
+        for g in segments:
+            s = session_by_id[g.session_id]
+            c = children.get(s.child_id)
+            it = items.get(g.item_id)
+            w.writerow([g.session_id, c.participant_code if c else None, s.session_type, s.condition, s.block_index,
+                        g.item_id, it.target_feature if it else None, g.phase, bool(g.revisit),
+                        g.started_at_ms, g.ended_at_ms, g.ended_at_ms - g.started_at_ms, g.samples,
+                        g.attending_samples, g.attending_fraction, json.dumps(g.states or {}, sort_keys=True)])
+
+    print(f"{len(children)} participants, {len(sessions)} sessions, {len(attempts)} attempts, "
+          f"{len(segments)} attention segments -> {out}/")
     db.close()
     return 0
 

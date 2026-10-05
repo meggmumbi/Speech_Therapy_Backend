@@ -268,6 +268,55 @@ def order_items(item_ids: Sequence[str], seed: int | None) -> list[str]:
     return ordered
 
 
+# --- the revisit round ---------------------------------------------------------
+
+#: Said once, before the first revisited item. Server-authored so that K and
+#: D hear the same bridge, and the round is announced as practice rather than
+#: as a test: a participant told they are being tested on the words they got
+#: wrong is in a different task from one asked to try them again.
+REVISIT_INTRO = "Let's go back to a few words from earlier and try them once more."
+
+
+def revisit_item_ids(attempts: Sequence, seed: int | None) -> list[str]:
+    """Which items come back at the end of a training block, in what order.
+
+    An item is revisited when the participant was *corrected* on it in the
+    main round: at least one of its scored, non-gated attempts was not
+    correct. Whether the second attempt then repaired it does not matter; the
+    revisit is the measure of whether the correction held a few minutes later,
+    and an item repaired on attempt two and one not repaired both carry that
+    question. Items the participant skipped are not brought back: a skip is a
+    refusal, not an error, and re-presenting it turns the refusal into one.
+
+    Only spoken items qualify. A tapped item in D has had its answer revealed,
+    so a revisit of it would measure recall of the key, not of the contrast.
+
+    The order is the session's own seeded shuffle restricted to the revisited
+    items, so that the sequence is reproducible from the session row exactly
+    as the main round's is. Rows already stamped as revisits are ignored, which
+    makes the function idempotent: the tablet can ask twice and get the same
+    answer, and the second answer does not include the revisits themselves.
+    """
+    corrected: set[str] = set()
+    skipped: set[str] = set()
+    for a in attempts:
+        if getattr(a, "revisit", None):
+            continue
+        item = str(a.item_id)
+        if getattr(a, "skipped", False):
+            skipped.add(item)
+            continue
+        if getattr(a, "gated", False):
+            continue
+        if getattr(a, "response_type", None) != "verbal":
+            continue
+        if a.is_correct is False:
+            corrected.add(item)
+    eligible = sorted(corrected - skipped)
+    ordered = order_items(eligible, seed)
+    return ordered
+
+
 def validate_lists(db=None) -> list[str]:
     """Problems with the current list configuration, empty if it is sound."""
     problems: list[str] = []

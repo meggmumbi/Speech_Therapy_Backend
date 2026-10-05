@@ -72,6 +72,10 @@ def _final_attempts(activities: list[models.SessionActivity]) -> list[models.Ses
     """
     latest: dict[Any, models.SessionActivity] = {}
     for activity in activities:
+        # A revisit is a later, separate measure of the same item, not the
+        # outcome of the main round; see study_design.revisit_item_ids.
+        if getattr(activity, "revisit", False):
+            continue
         current = latest.get(activity.item_id)
         if current is None or (activity.attempt_number or 0) >= (current.attempt_number or 0):
             latest[activity.item_id] = activity

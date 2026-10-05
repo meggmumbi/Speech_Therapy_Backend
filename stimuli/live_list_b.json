@@ -1,0 +1,189 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "bag"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "bus"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "She put the bag on the chair.",
+        "target_word": "bag"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "bag",
+          "bug"
+        ],
+        "answer": "bag"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "hit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "lip"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "He hit the ball with the bat.",
+        "target_word": "hit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "hit",
+          "heat"
+        ],
+        "answer": "hit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "good"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The glass is full of water.",
+        "target_word": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "full",
+          "fool"
+        ],
+        "answer": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "thin"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "mouth"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "This book is thin.",
+        "target_word": "thin"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "thin",
+          "tin"
+        ],
+        "answer": "thin"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "arrive"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "We cooked rice for dinner.",
+        "target_word": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "rice",
+          "lice"
+        ],
+        "answer": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-hear"
+    }
+  ]
+}

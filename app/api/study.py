@@ -381,6 +381,111 @@ def session_items(session_id: uuid.UUID, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/sessions/{session_id}/revisits")
+def session_revisits(session_id: uuid.UUID, db: Session = Depends(get_db)):
+    """The revisit round: items this participant was corrected on, once more.
+
+    Asked for by the tablet when the main round ends. The selection is made
+    here, from the stored attempts, so that what came back is derivable from
+    the database and not from a counter on the device; see
+    ``study_design.revisit_item_ids`` for the rule. Empty for an assessment,
+    which gives no corrections and therefore has nothing to revisit, and empty
+    for a participant who got everything right first time.
+
+    The intro line is returned rather than hard-coded on the tablet so that
+    both conditions hear the same words.
+    """
+    session = (
+        db.query(models.TherapySession)
+        .filter(models.TherapySession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(404, "Session not found")
+    if study_design.is_assessment(session.session_type):
+        return {"session_id": str(session_id), "session_type": session.session_type,
+                "condition": None, "gives_feedback": False, "intro_speech": None, "items": []}
+    attempts = (
+        db.query(models.SessionActivity)
+        .filter(models.SessionActivity.session_id == session_id)
+        .all()
+    )
+    ordered_ids = study_design.revisit_item_ids(attempts, session.item_order_seed)
+    items = (
+        db.query(models.ActivityItem)
+        .filter(models.ActivityItem.id.in_([uuid.UUID(i) for i in ordered_ids]))
+        .all()
+    ) if ordered_ids else []
+    by_id = {str(item.id): item for item in items}
+    return {
+        "session_id": str(session_id),
+        "session_type": session.session_type,
+        "condition": session.condition,
+        "gives_feedback": True,
+        "intro_speech": study_design.REVISIT_INTRO if ordered_ids else None,
+        "items": [
+            {**_present(by_id[item_id], session.item_order_seed, teaching=True), "revisit": True}
+            for item_id in ordered_ids if item_id in by_id
+        ],
+    }
+
+
+class AttentionSegmentIn(BaseModel):
+    item_id: uuid.UUID | None = None
+    phase: str
+    revisit: bool = False
+    started_at_ms: int
+    ended_at_ms: int
+    samples: int = 0
+    attending_samples: int = 0
+    states: dict[str, int] = {}
+
+
+class AttentionRequest(BaseModel):
+    segments: list[AttentionSegmentIn]
+
+
+@router.post("/sessions/{session_id}/attention")
+def record_attention(
+    session_id: uuid.UUID,
+    request: AttentionRequest,
+    db: Session = Depends(get_db),
+    current_user: models.Caregiver = Depends(get_current_user),
+):
+    """Store the per-item attention segments the tablet collected.
+
+    Derived states only; see ``models.attention_segment``. Accepted whole or
+    not at all, and a second upload for the same session replaces the first,
+    so a retry after a dropped connection cannot double the counts.
+    """
+    session = (
+        db.query(models.TherapySession)
+        .filter(models.TherapySession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(404, "Session not found")
+    from ..models.attention_segment import PHASES, AttentionSegment
+    for seg in request.segments:
+        if seg.phase not in PHASES:
+            raise HTTPException(422, f"unknown phase {seg.phase!r}; one of {', '.join(PHASES)}")
+        if seg.ended_at_ms < seg.started_at_ms:
+            raise HTTPException(422, "a segment cannot end before it starts")
+        if seg.attending_samples > seg.samples:
+            raise HTTPException(422, "attending_samples cannot exceed samples")
+    db.query(AttentionSegment).filter(AttentionSegment.session_id == session_id).delete()
+    for seg in request.segments:
+        db.add(AttentionSegment(
+            session_id=session_id, item_id=seg.item_id, phase=seg.phase, revisit=seg.revisit,
+            started_at_ms=seg.started_at_ms, ended_at_ms=seg.ended_at_ms,
+            samples=seg.samples, attending_samples=seg.attending_samples,
+            attending_fraction=(seg.attending_samples / seg.samples) if seg.samples else None,
+            states={str(k): int(v) for k, v in seg.states.items()},
+        ))
+    db.commit()
+    return {"session_id": str(session_id), "segments": len(request.segments)}
+
+
 def _present(item: models.ActivityItem, seed: int | None,
              teaching: bool = True) -> dict:
     """One item as the tablet should see it.

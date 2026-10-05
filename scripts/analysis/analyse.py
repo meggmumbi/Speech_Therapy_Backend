@@ -50,9 +50,13 @@ def load(directory: str) -> dict[str, pd.DataFrame]:
     d = Path(directory)
     frames = {name: pd.read_csv(d / f"{name}.csv") for name in ("participants", "sessions", "attempts", "questionnaires")}
     a = frames["attempts"]
-    for col in ("spoken", "is_first", "is_final", "gated", "skipped", "slow_replay", "celebration"):
+    if "revisit" not in a.columns:
+        a["revisit"] = False
+    for col in ("spoken", "is_first", "is_final", "gated", "skipped", "slow_replay", "celebration", "revisit"):
         a[col] = a[col].astype(str).str.lower().eq("true")
     a["correct"] = a["correct"].map({"True": 1.0, "False": 0.0, True: 1.0, False: 0.0})
+    attention = d / "attention.csv"
+    frames["attention"] = pd.read_csv(attention) if attention.exists() else pd.DataFrame()
     return frames
 
 
@@ -68,7 +72,10 @@ def simulate(n_participants: int, seed: int = 2026, effects: dict | None = None)
     """
     e = {"base_first": 0.65, "d_first_or": 1.0, "base_uptake": 0.45, "d_uptake_or": 2.0,
          "post_gain_or": 1.6, "delayed_gain_or": 1.3, "sd_participant": 0.8, "sd_item": 0.5,
-         "trust_d": 0.4, "sd_scale": 0.9}
+         "trust_d": 0.4, "sd_scale": 0.9,
+         # The revisit round: a corrected item said once more at block end.
+         # Retention is assumed somewhat below uptake, with the same D advantage.
+         "base_revisit": 0.40, "d_revisit_or": 2.0}
     e.update(effects or {})
     rng = np.random.default_rng(seed)
     logit = lambda p: math.log(p / (1 - p))
@@ -93,7 +100,7 @@ def simulate(n_participants: int, seed: int = 2026, effects: dict | None = None)
                                  item=it, target_feature=feat_of[it], spoken=True, attempt_number=1, is_first=True,
                                  is_final=c1, correct=float(c1), graded_score=float(np.clip(inv(eta) + rng.normal(0, 0.12), 0, 1)),
                                  response_time_s=float(np.exp(rng.normal(0.6, 0.4))), feedback_words=7 if cond == "K" else 14,
-                                 gated=False, skipped=False))
+                                 gated=False, skipped=False, revisit=False))
                 if not c1:
                     eta2 = logit(e["base_uptake"]) + u_p + u_item[it] + (math.log(e["d_uptake_or"]) if cond == "D" else 0)
                     c2 = rng.random() < inv(eta2)
@@ -101,7 +108,14 @@ def simulate(n_participants: int, seed: int = 2026, effects: dict | None = None)
                                      item=it, target_feature=feat_of[it], spoken=True, attempt_number=2, is_first=False,
                                      is_final=True, correct=float(c2), graded_score=float(np.clip(inv(eta2) + rng.normal(0, 0.12), 0, 1)),
                                      response_time_s=float(np.exp(rng.normal(0.6, 0.4))), feedback_words=7 if cond == "K" else 14,
-                                     gated=False, skipped=False))
+                                     gated=False, skipped=False, revisit=False))
+                    eta3 = logit(e["base_revisit"]) + u_p + u_item[it] + (math.log(e["d_revisit_or"]) if cond == "D" else 0)
+                    c3 = rng.random() < inv(eta3)
+                    rows.append(dict(participant=code, session_type="training", condition=cond, block=block, list=lst,
+                                     item=it, target_feature=feat_of[it], spoken=True, attempt_number=3, is_first=False,
+                                     is_final=False, correct=float(c3), graded_score=float(np.clip(inv(eta3) + rng.normal(0, 0.12), 0, 1)),
+                                     response_time_s=float(np.exp(rng.normal(0.6, 0.4))), feedback_words=7 if cond == "K" else 14,
+                                     gated=False, skipped=False, revisit=True))
             qrows.append(dict(participant=code, condition=cond, block=block,
                               godspeed=float(np.clip(4.5 + rng.normal(0, e["sd_scale"]), 1, 7)),
                               motivation=float(np.clip(4.8 + rng.normal(0, e["sd_scale"]), 1, 7)),
@@ -114,11 +128,12 @@ def simulate(n_participants: int, seed: int = 2026, effects: dict | None = None)
                 rows.append(dict(participant=code, session_type=phase, condition=None, block=None, list="T", item=it,
                                  target_feature=feat_of[it], spoken=True, attempt_number=1, is_first=True, is_final=True,
                                  correct=float(c), graded_score=float(np.clip(inv(eta) + rng.normal(0, 0.12), 0, 1)),
-                                 response_time_s=float(np.exp(rng.normal(0.6, 0.4))), feedback_words=7, gated=False, skipped=False))
+                                 response_time_s=float(np.exp(rng.normal(0.6, 0.4))), feedback_words=7, gated=False, skipped=False,
+                                 revisit=False))
     a = pd.DataFrame(rows)
     a["attempt"] = range(len(a))
     return {"participants": pd.DataFrame(prow), "attempts": a, "questionnaires": pd.DataFrame(qrows),
-            "sessions": pd.DataFrame(), "assumptions": e}
+            "sessions": pd.DataFrame(), "attention": pd.DataFrame(), "assumptions": e}
 
 
 # --- the outcomes ---------------------------------------------------------------
@@ -135,12 +150,18 @@ def training_outcomes(a: pd.DataFrame) -> dict:
         f = first[first.condition == cond]
         n_wrong = int((f.correct == 0).sum())
         # Uptake: among items whose first attempt was wrong, was the second right?
-        second = t[(t.condition == cond) & (t.attempt_number == 2)]
+        second = t[(t.condition == cond) & (t.attempt_number == 2) & ~t.revisit]
+        # Retention within the session: the corrected item said once more at
+        # the end of the block, under the same condition. The one measure of
+        # "did the correction hold" that carries a condition.
+        rev = t[(t.condition == cond) & t.revisit]
         out[cond] = {
             "first_attempts": int(len(f)), "first_correct": int(f.correct.sum()),
             "first_accuracy_pct": _rate(f.correct.sum(), len(f)),
             "corrections": n_wrong, "second_attempts": int(len(second)),
             "uptake": int(second.correct.sum()), "uptake_pct": _rate(second.correct.sum(), len(second)),
+            "revisits": int(len(rev)), "revisit_correct": int(rev.correct.sum()),
+            "revisit_pct": _rate(rev.correct.sum(), len(rev)),
             "graded_mean": round(float(f.graded_score.mean()), 3) if len(f) else None,
             "response_time_median_s": round(float(f.response_time_s.median()), 2) if len(f) else None,
             "feedback_words_mean": round(float(t[t.condition == cond].feedback_words.mean()), 1) if len(t) else None,
@@ -165,6 +186,26 @@ def learning_outcomes(a: pd.DataFrame) -> dict:
                 row[phase] = f"{int(x.correct.sum())} / {len(x)}"
         if row:
             out["by_feature"][f] = row
+    return out
+
+
+def attention_outcomes(g: pd.DataFrame) -> dict:
+    """Descriptive only: mean attending fraction by phase and condition, over
+    segments with at least one sample. No model is fitted, because the measure
+    is an engine's classification of head pose at 2 Hz and the study makes no
+    claim that rests on it."""
+    if g is None or g.empty:
+        return {}
+    x = g[(g.samples > 0) & (g.session_type == "training")]
+    if x.empty:
+        return {}
+    out = {}
+    for (cond, phase), grp in x.groupby(["condition", "phase"]):
+        out.setdefault(str(cond), {})[str(phase)] = {
+            "segments": int(len(grp)),
+            "attending_mean": round(float(grp.attending_fraction.mean()), 3),
+            "no_person_segments": int((g[(g.condition == cond) & (g.phase == phase)].samples == 0).sum()),
+        }
     return out
 
 
@@ -248,14 +289,25 @@ def models(frames: dict[str, pd.DataFrame]) -> list[dict]:
     first = t[t.is_first].copy()
     first["D"] = (first.condition == "D").astype(int)
     first["block2"] = (first.block == 2).astype(int)
-    second = t[t.attempt_number == 2].copy()
+    second = t[(t.attempt_number == 2) & ~t.revisit].copy()
     second["D"] = (second.condition == "D").astype(int)
+    rev = t[t.revisit].copy()
+    rev["D"] = (rev.condition == "D").astype(int)
+    # Whether the item had already been repaired on attempt two, so that the
+    # revisit model can separate "held a repair" from "repaired late".
+    repaired = second[second.correct == 1][["participant", "session_type", "block", "item"]].drop_duplicates()
+    repaired["repaired"] = 1
+    rev = rev.merge(repaired, on=["participant", "session_type", "block", "item"], how="left")
+    rev["repaired"] = rev["repaired"].fillna(0).astype(int)
     s = a[a.session_type.isin(["pretest", "posttest", "delayed"]) & a.spoken & ~a.gated & ~a.skipped & a.is_first].copy()
     s["post"] = (s.session_type == "posttest").astype(int)
     s["delayed"] = (s.session_type == "delayed").astype(int)
     out = [
         _fit_binomial(first, "correct ~ D + block2", "M1 first-attempt accuracy, K vs D", n_p),
         _fit_binomial(second, "correct ~ D", "M2 uptake after a correction, K vs D", n_p),
+        _fit_binomial(rev, "correct ~ D + repaired", "M2b revisit at block end (retention), K vs D", n_p)
+        if len(rev) else {"label": "M2b revisit at block end (retention), K vs D", "fit": "skipped",
+                          "note": "no revisit rows: the round was not run in these sessions", "n": 0},
         _fit_linear(first, "graded_score ~ D + block2", "graded_score", "M3 graded score, K vs D", n_p),
         _fit_binomial(s, "correct ~ post + delayed" if s.delayed.any() else "correct ~ post", "M4 assessment accuracy over time", n_p),
     ]
@@ -278,15 +330,17 @@ def power(n_participants: int, reps: int, seed: int, effects: dict | None = None
     sign and rough size of the effect."""
     import statsmodels.api as sm
     import statsmodels.formula.api as smf
-    hits = {"uptake": 0, "post_gain": 0, "first_accuracy": 0}
+    hits = {"uptake": 0, "revisit": 0, "post_gain": 0, "first_accuracy": 0}
     for r in range(reps):
         f = simulate(n_participants, seed + r, effects)
         a = f["attempts"]
         t = a[a.session_type == "training"]
-        second = t[t.attempt_number == 2].copy(); second["D"] = (second.condition == "D").astype(int)
+        second = t[(t.attempt_number == 2) & ~t.revisit].copy(); second["D"] = (second.condition == "D").astype(int)
+        rev = t[t.revisit].copy(); rev["D"] = (rev.condition == "D").astype(int)
         first = t[t.is_first].copy(); first["D"] = (first.condition == "D").astype(int)
         s = a[a.session_type.isin(["pretest", "posttest"])].copy(); s["post"] = (s.session_type == "posttest").astype(int)
-        for key, df, formula, term in (("uptake", second, "correct ~ D", "D"), ("first_accuracy", first, "correct ~ D", "D"),
+        for key, df, formula, term in (("uptake", second, "correct ~ D", "D"), ("revisit", rev, "correct ~ D", "D"),
+                                       ("first_accuracy", first, "correct ~ D", "D"),
                                        ("post_gain", s, "correct ~ post", "post")):
             try:
                 m = smf.gee(formula, "participant", df, family=sm.families.Binomial(), cov_struct=sm.cov_struct.Exchangeable()).fit()
@@ -323,6 +377,7 @@ def run(frames: dict[str, pd.DataFrame]) -> dict:
         "training": training_outcomes(a),
         "learning": learning_outcomes(a),
         "questionnaires": questionnaire_outcomes(frames["questionnaires"]),
+        "attention": attention_outcomes(frames.get("attention")),
         "models": models(frames),
     }
 
@@ -333,12 +388,15 @@ def _print(result: dict) -> None:
     print("\nTraining, K vs D:")
     for c, r in result["training"].items():
         print(f"  {c}: first-attempt accuracy {r['first_correct']}/{r['first_attempts']} ({r['first_accuracy_pct']}%), "
-              f"uptake {r['uptake']}/{r['second_attempts']} ({r['uptake_pct']}%), graded {r['graded_mean']}, "
+              f"uptake {r['uptake']}/{r['second_attempts']} ({r['uptake_pct']}%), "
+              f"revisit {r['revisit_correct']}/{r['revisits']} ({r['revisit_pct']}%), graded {r['graded_mean']}, "
               f"RT median {r['response_time_median_s']} s, feedback {r['feedback_words_mean']} words")
     print("\nLearning:", json.dumps(result["learning"]["overall"], indent=1))
     for f, row in result["learning"]["by_feature"].items():
         print(f"  {f:20} {row}")
     print("\nQuestionnaires:", json.dumps(result["questionnaires"], indent=1))
+    if result.get("attention"):
+        print("\nAttention (descriptive):", json.dumps(result["attention"], indent=1))
     print("\nModels:")
     for m in result["models"]:
         print(f"  {m['label']}: {m.get('fit', '')}  n={m.get('n', '')}")

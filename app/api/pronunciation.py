@@ -214,6 +214,10 @@ async def score_pronunciation_attempt(
     # changes the stimulus rather than only the pacing.
     prompt_replays: int = Form(0),
     slow_replay_used: bool = Form(False),
+    # The revisit round at the end of a training block: one more attempt at
+    # each item the participant was corrected on. Stamped on the row and given
+    # no retry, whatever the verdict. See study_design.revisit_item_ids.
+    revisit: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """Score one spoken attempt and return the robot's next utterance."""
@@ -333,8 +337,11 @@ async def score_pronunciation_attempt(
     # An assessment never offers one. A second attempt after an implicit "that
     # was not right" is both feedback and practice, which is the thing an
     # assessment exists not to provide.
+    if revisit and is_assessment:
+        raise HTTPException(400, "an assessment has no revisit round")
     retry_available = (
         not is_assessment
+        and not revisit
         and not result.is_correct
         and not gated
         and (scored_before + 1) < config.max_attempts_per_item
@@ -389,6 +396,7 @@ async def score_pronunciation_attempt(
         prompt_replays=max(0, prompt_replays),
         slow_replay_used=bool(slow_replay_used),
         skipped=False,
+        revisit=bool(revisit),
         celebration_shown=(feedback.kind == "praise"),
         # Copied from the item at the time. Last week every sentence attempt
         # was stored as NULL, i.e. repeat_word, and the summary could not tell
@@ -452,6 +460,7 @@ async def score_pronunciation_attempt(
         },
         # Authoritative: the client advances the item when this is false.
         "should_retry": retry_available,
+        "revisit": bool(revisit),
         "score": result.score,
         "verdict_score": result.verdict_score,
         "confidence": result.confidence,

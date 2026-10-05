@@ -1,0 +1,124 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "cat"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "bag"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "map"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "ship"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "hit"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "chip"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "pull"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "full"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "foot"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "think"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "thin"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "thumb"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "right"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "rice"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "road"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-novel"
+    }
+  ]
+}

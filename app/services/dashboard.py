@@ -48,6 +48,9 @@ def _step_of(session: models.TherapySession) -> str | None:
 def _final_attempts(rows: list[models.SessionActivity]) -> list[models.SessionActivity]:
     latest: dict[Any, models.SessionActivity] = {}
     for a in rows:
+        # The revisit round is its own measure, not the item's outcome.
+        if getattr(a, "revisit", False):
+            continue
         key = (a.session_id, a.item_id)
         cur = latest.get(key)
         if cur is None or (a.attempt_number or 0) >= (cur.attempt_number or 0):

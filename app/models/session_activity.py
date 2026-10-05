@@ -49,6 +49,16 @@ class SessionActivity(Base):
     skipped = Column(Boolean)
     skip_reason = Column(String(20))   # cant_say | cant_hear | other
 
+    # The revisit round. At the end of a training block every spoken item the
+    # participant was corrected on comes back once, under the same condition.
+    # That single attempt is the only within-session retention measure the
+    # design has that carries a condition: the pre/post assessments cannot,
+    # because every feature is trained under both conditions in every
+    # participant. NULL on rows written before the round existed, which reads
+    # as "main round" everywhere; attempt_number keeps counting across the
+    # boundary so the ordering of an item's attempts stays one sequence.
+    revisit = Column(Boolean)
+
     # Was the robot instructed to celebrate this attempt? Not inferable from
     # is_correct, which is true in assessments too, where nothing is performed.
     #
