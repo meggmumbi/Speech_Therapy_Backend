@@ -39,6 +39,29 @@ def download_model() -> int:
     return 0
 
 
+def download_asr() -> int:
+    """Fetch the faster-whisper model used as the transcript safety net.
+
+    Like the acoustic model: fetched once with network access, then loaded
+    offline. Which model is fetched follows ``PipelineConfig.server_asr``.
+    """
+    os.environ["HF_HUB_OFFLINE"] = "0"
+    from app.services.pronunciation import asr
+    from app.services.pronunciation.runtime import build_config
+
+    name = build_config().server_asr
+    if not name:
+        print("  server_asr is disabled in PipelineConfig; nothing to fetch")
+        return 0
+    print(f"  fetching faster-whisper {name} ...")
+    asr.warmup(name)
+    if not asr.is_available(name):
+        print("  FAILED (is faster-whisper installed? pip install faster-whisper)")
+        return 1
+    print(f"  ready: faster-whisper {name}")
+    return 0
+
+
 def main() -> int:
     import nltk
 
@@ -75,4 +98,6 @@ if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     if "--download-model" in sys.argv:
         raise SystemExit(download_model())
+    if "--download-asr" in sys.argv:
+        raise SystemExit(download_asr())
     raise SystemExit(main())

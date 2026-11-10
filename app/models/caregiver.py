@@ -12,3 +12,7 @@ class Caregiver(Base):
     email = Column(String(100), unique=True, nullable=False)
     hashed_password = Column(String(200), nullable=False)
     is_active = Column(Boolean, default=True)
+    # researcher | rater. A rater can listen and judge, and see nothing else:
+    # no participants, no dashboard, no stimuli. Raters are external people
+    # and must see none of the study apart from the clips they are judging.
+    role = Column(String(12), default="researcher")

@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="Added personalization" />
+    <list default="true" id="eea06d86-0ea5-4fa9-8296-e3ff2a7a4086" name="Changes" comment="Added personalization   TODAY">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/update_database.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/update_database.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -87,6 +91,7 @@
       <workItem from="1779165835372" duration="2565000" />
       <workItem from="1779906331266" duration="2752000" />
       <workItem from="1787732617256" duration="207000" />
+      <workItem from="1787732844268" duration="22415000" />
     </task>
     <task id="LOCAL-00001" summary="Asd Speech therapy backend">
       <option name="closed" value="true" />
@@ -168,7 +173,15 @@
       <option name="project" value="LOCAL" />
       <updated>1787732729716</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Added personalization   TODAY">
+      <option name="closed" value="true" />
+      <created>1787732996694</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1787732996694</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -179,7 +192,19 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="origin/master" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
           </value>
         </entry>
       </map>
@@ -194,7 +219,8 @@
     <MESSAGE value="fix performance overview Endpoint" />
     <MESSAGE value="fix Analytics endpoint" />
     <MESSAGE value="Added personalization" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added personalization" />
+    <MESSAGE value="Added personalization   TODAY" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added personalization   TODAY" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -11,3 +11,6 @@ from .ChildCategoryDisplay import ChildCategoryDisplay
 from .GazeTrackingData import GazeTrackingData
 from .token_blacklist import TokenBlacklist
 from .study_assignment import StudyAssignment
+from .session_questionnaire import SessionQuestionnaire, SessionNote
+from .rating import RatingSet, Rating
+from .attention_segment import AttentionSegment

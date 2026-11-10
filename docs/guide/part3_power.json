@@ -1,0 +1,23 @@
+{
+ "power": {
+  "n_participants": 40,
+  "reps": 200,
+  "power_pct": {
+   "uptake": 87.0,
+   "post_gain": 98.0,
+   "first_accuracy": 4.5
+  },
+  "assumptions": {
+   "base_first": 0.65,
+   "d_first_or": 1.0,
+   "base_uptake": 0.45,
+   "d_uptake_or": 2.0,
+   "post_gain_or": 1.6,
+   "delayed_gain_or": 1.3,
+   "sd_participant": 0.8,
+   "sd_item": 0.5,
+   "trust_d": 0.4,
+   "sd_scale": 0.9
+  }
+ }
+}

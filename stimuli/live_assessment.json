@@ -1,0 +1,124 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "paddle"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "mastered"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "capacity"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "litter"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "filling"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "significant"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "pulling"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "cookie"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "cushion"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "thinker"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "worthy"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "authentic"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-novel"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "correct"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-a"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "arrive"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-b"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "liberal"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-novel"
+    }
+  ]
+}

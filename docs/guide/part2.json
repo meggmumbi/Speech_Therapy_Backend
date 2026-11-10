@@ -1,0 +1,400 @@
+{
+ "participant": {
+  "participant_code": "P1",
+  "age": 24,
+  "gender": "Female",
+  "first_language": "Gikuyu",
+  "other_languages": "English",
+  "home_language": "Kiswahili",
+  "region_of_upbringing": "Kiambu",
+  "english_onset_age": 4,
+  "primary_medium_of_instruction": "english",
+  "self_rated_english": "C2",
+  "voice_assistant_use": "never",
+  "hearing_or_speech_difficulty": false,
+  "consent_participation": true,
+  "consent_audio_retention": true,
+  "consent_date": "2026-10-01"
+ },
+ "assignment": {
+  "group_index": 3,
+  "block1": "D-B",
+  "block2": "K-A",
+  "excluded": false
+ },
+ "sessions": [
+  {
+   "id": "dc474dbd",
+   "type": "pretest",
+   "condition": null,
+   "block": null,
+   "list": "test",
+   "minutes": 4.6,
+   "items": 21,
+   "attempts": 21,
+   "spoken": 21,
+   "tapped": 0,
+   "verdicts": {
+    "correct": 12,
+    "close": 7,
+    "incorrect": 2
+   },
+   "first_attempt_correct": 12,
+   "first_attempts": 21,
+   "retries": 0,
+   "tapped_correct": 0,
+   "skipped": 0,
+   "gated": 0,
+   "replays": 0,
+   "mean_response_s": 3.18,
+   "mean_verdict_score": 0.755,
+   "mean_graded_score": 0.835,
+   "feedback_kinds": {
+    "other": 12,
+    "correction": 9
+   },
+   "mean_feedback_words": 7.0
+  },
+  {
+   "id": "ffd98edc",
+   "type": "training",
+   "condition": "D",
+   "block": 1,
+   "list": "list_b",
+   "minutes": 7.6,
+   "items": 21,
+   "attempts": 24,
+   "spoken": 17,
+   "tapped": 7,
+   "verdicts": {
+    "incorrect": 4,
+    "correct": 11,
+    "close": 2
+   },
+   "first_attempt_correct": 11,
+   "first_attempts": 14,
+   "retries": 3,
+   "tapped_correct": 7,
+   "skipped": 0,
+   "gated": 0,
+   "replays": 3,
+   "mean_response_s": 7.59,
+   "mean_verdict_score": 0.661,
+   "mean_graded_score": 0.791,
+   "feedback_kinds": {
+    "correction": 6,
+    "celebration": 11
+   },
+   "mean_feedback_words": 12.9
+  },
+  {
+   "id": "0185ab3d",
+   "type": "training",
+   "condition": "K",
+   "block": 2,
+   "list": "list_a",
+   "minutes": 12.6,
+   "items": 21,
+   "attempts": 23,
+   "spoken": 16,
+   "tapped": 7,
+   "verdicts": {
+    "correct": 13,
+    "close": 3
+   },
+   "first_attempt_correct": 12,
+   "first_attempts": 14,
+   "retries": 2,
+   "tapped_correct": 4,
+   "skipped": 0,
+   "gated": 0,
+   "replays": 1,
+   "mean_response_s": 31.65,
+   "mean_verdict_score": 0.818,
+   "mean_graded_score": 0.88,
+   "feedback_kinds": {
+    "celebration": 13,
+    "correction": 3
+   },
+   "mean_feedback_words": 6.8
+  },
+  {
+   "id": "6855e933",
+   "type": "posttest",
+   "condition": null,
+   "block": null,
+   "list": "test",
+   "minutes": 5.2,
+   "items": 21,
+   "attempts": 21,
+   "spoken": 21,
+   "tapped": 0,
+   "verdicts": {
+    "incorrect": 5,
+    "close": 3,
+    "correct": 13
+   },
+   "first_attempt_correct": 13,
+   "first_attempts": 21,
+   "retries": 0,
+   "tapped_correct": 0,
+   "skipped": 0,
+   "gated": 0,
+   "replays": 0,
+   "mean_response_s": 5.5,
+   "mean_verdict_score": 0.706,
+   "mean_graded_score": 0.791,
+   "feedback_kinds": {
+    "correction": 8,
+    "other": 13
+   },
+   "mean_feedback_words": 7.0
+  }
+ ],
+ "by_feature": {
+  "polysyllabic_stress": {
+   "pretest": [
+    3,
+    3
+   ],
+   "posttest": [
+    3,
+    3
+   ]
+  },
+  "schwa_reduction": {
+   "pretest": [
+    2,
+    3
+   ],
+   "posttest": [
+    3,
+    3
+   ]
+  },
+  "foot_goose": {
+   "pretest": [
+    2,
+    3
+   ],
+   "posttest": [
+    2,
+    3
+   ]
+  },
+  "kit_fleece": {
+   "pretest": [
+    3,
+    3
+   ],
+   "posttest": [
+    2,
+    3
+   ]
+  },
+  "trap_palm_strut": {
+   "pretest": [
+    0,
+    3
+   ],
+   "posttest": [
+    0,
+    3
+   ]
+  },
+  "dental_fricative": {
+   "pretest": [
+    2,
+    3
+   ],
+   "posttest": [
+    1,
+    3
+   ]
+  },
+  "rhotic_lateral": {
+   "pretest": [
+    0,
+    3
+   ],
+   "posttest": [
+    2,
+    3
+   ]
+  }
+ },
+ "questionnaires": [
+  {
+   "condition": "D",
+   "block": 1,
+   "scores": {
+    "godspeed": 4.5,
+    "motivation": 3.14,
+    "feedback_trust": 3.6
+   },
+   "duration_seconds": 23,
+   "answers": {
+    "dislike_like": 7,
+    "unfriendly_friendly": 6,
+    "unkind_kind": 5,
+    "incompetent_competent": 4,
+    "ignorant_knowledgeable": 3,
+    "irresponsible_responsible": 2,
+    "enjoyed": 1,
+    "attention_held": 2,
+    "competent": 3,
+    "improved": 4,
+    "tense": 5,
+    "pressured": 6,
+    "would_continue": 7,
+    "accurate": 6,
+    "missed": 5,
+    "specific": 4,
+    "actionable": 3,
+    "would_rely": 2
+   }
+  },
+  {
+   "condition": "K",
+   "block": 2,
+   "scores": {
+    "godspeed": 3.5,
+    "motivation": 4.86,
+    "feedback_trust": 4.4
+   },
+   "duration_seconds": 28,
+   "answers": {
+    "dislike_like": 1,
+    "unfriendly_friendly": 2,
+    "unkind_kind": 3,
+    "incompetent_competent": 4,
+    "ignorant_knowledgeable": 5,
+    "irresponsible_responsible": 6,
+    "enjoyed": 7,
+    "attention_held": 6,
+    "competent": 5,
+    "improved": 4,
+    "tense": 3,
+    "pressured": 2,
+    "would_continue": 1,
+    "accurate": 2,
+    "missed": 3,
+    "specific": 4,
+    "actionable": 5,
+    "would_rely": 6
+   }
+  }
+ ],
+ "inventory": {
+  "list_b": {
+   "name": "Study List B",
+   "items": 21,
+   "by_type": {
+    "read_sentence": 7,
+    "repeat_word": 7,
+    "minimal_pair_id": 5,
+    "schwa_spot": 1,
+    "stress_place": 1
+   },
+   "by_feature": {
+    "rhotic_lateral": 3,
+    "schwa_reduction": 3,
+    "trap_palm_strut": 3,
+    "kit_fleece": 3,
+    "foot_goose": 3,
+    "dental_fricative": 3,
+    "polysyllabic_stress": 3
+   },
+   "with_audio": 5
+  },
+  "test": {
+   "name": "Study Assessment Set",
+   "items": 21,
+   "by_type": {
+    "repeat_word": 21
+   },
+   "by_feature": {
+    "trap_palm_strut": 3,
+    "kit_fleece": 3,
+    "foot_goose": 3,
+    "dental_fricative": 3,
+    "rhotic_lateral": 3,
+    "schwa_reduction": 3,
+    "polysyllabic_stress": 3
+   },
+   "with_audio": 0
+  },
+  "list_a": {
+   "name": "Study List A",
+   "items": 21,
+   "by_type": {
+    "read_sentence": 7,
+    "repeat_word": 7,
+    "schwa_spot": 1,
+    "minimal_pair_id": 5,
+    "stress_place": 1
+   },
+   "by_feature": {
+    "trap_palm_strut": 3,
+    "kit_fleece": 3,
+    "foot_goose": 3,
+    "dental_fricative": 3,
+    "rhotic_lateral": 3,
+    "schwa_reduction": 3,
+    "polysyllabic_stress": 3
+   },
+   "with_audio": 5
+  }
+ },
+ "example_attempt": {
+  "item": "hat",
+  "session": "pretest",
+  "attempt_number": 1,
+  "exercise_type": "repeat_word",
+  "verdict": "close",
+  "verdict_score": 0.7495,
+  "pronunciation_score": 0.8704,
+  "confidence": 0.9994,
+  "expected_phones": [
+   "HH",
+   "AE",
+   "T"
+  ],
+  "observed_phones": [
+   "HH",
+   "AA",
+   "T"
+  ],
+  "phone_scores": [
+   [
+    "HH",
+    0.95
+   ],
+   [
+    "AE",
+    0.58
+   ],
+   [
+    "T",
+    0.92
+   ]
+  ],
+  "diagnoses": [
+   [
+    "substitution",
+    "AE",
+    "AA",
+    0.58
+   ]
+  ],
+  "transcript": "HUT!",
+  "transcript_matches": false,
+  "feedback": "Thank you. Here is the next one.",
+  "response_time_seconds": 1.271,
+  "audio_peak": 0.84,
+  "audio_rms_dbfs": -8.8,
+  "audio_quality": "ok",
+  "config_hash": "010efed66150",
+  "pipeline_version": "2.0.0-dev"
+ }
+}

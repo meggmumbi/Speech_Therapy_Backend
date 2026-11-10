@@ -1,0 +1,189 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "paddle"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "analysis"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The children paddle in the shallow lake.",
+        "target_word": "paddle"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "paddle",
+          "puddle"
+        ],
+        "answer": "paddle"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "litter"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "statistical"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "Please put the litter in the bin.",
+        "target_word": "litter"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "litter",
+          "litre"
+        ],
+        "answer": "litter"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "pulling"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "bulletin"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The team is pulling in the same direction.",
+        "target_word": "pulling"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "pulling",
+          "pooling"
+        ],
+        "answer": "pulling"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "thinker"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "hypothesis"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "She is a careful thinker.",
+        "target_word": "thinker"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "thinker",
+          "tinker"
+        ],
+        "answer": "thinker"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "correct"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "parallel"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "Please correct the mistakes in the essay.",
+        "target_word": "correct"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "correct",
+          "collect"
+        ],
+        "answer": "correct"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-hear"
+    }
+  ]
+}

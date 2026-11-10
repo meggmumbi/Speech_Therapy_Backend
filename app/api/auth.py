@@ -7,7 +7,7 @@ from starlette import status
 from ..schemas.caregiver import CaregiverCreate
 from ..models.caregiver import Caregiver
 from ..database import get_db
-from ..utils.auth import get_password_hash, create_access_token, verify_password, blacklist_token
+from ..utils.auth import get_current_user, get_password_hash, create_access_token, verify_password, blacklist_token
 
 router = APIRouter()
 
@@ -45,6 +45,12 @@ def login(
 
     access_token = create_access_token(data={"sub": caregiver.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/me")
+def me(user: Caregiver = Depends(get_current_user)):
+    """Who is signed in and what they may see. The console routes on role."""
+    return {"username": user.username, "role": user.role or "researcher"}
 
 
 @router.post("/logout")

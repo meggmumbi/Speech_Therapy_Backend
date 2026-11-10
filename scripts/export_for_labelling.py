@@ -24,11 +24,14 @@ import soundfile as sf
 from sqlalchemy import text
 
 from app.database import engine
-from app.services.pronunciation import score_attempt
+from app.services.pronunciation import asr, score_attempt
 from app.services.pronunciation.runtime import get_config, get_model, warmup
 
 warmup()
 model, config = get_model(), get_config()
+from app.services.pronunciation.md_scorer import md_layer_active
+print(f"config {config.config_hash()}  md_layer "
+      f"{'active' if md_layer_active() else 'INACTIVE'}  asr {config.server_asr}")
 
 with engine.connect() as conn:
     items = {str(r[0]): r[1] for r in conn.execute(text(
@@ -45,13 +48,17 @@ for word, attempt, path in sorted(rows):
     wav, sr = sf.read(path, dtype="float32", always_2d=False)
     if wav.ndim > 1:
         wav = wav.mean(axis=1)
-    r = score_attempt(word, wav, sr, model, config)
+    # Scored exactly as the server scores it, safety net included, so the
+    # labels judge the verdict a participant would actually have heard.
+    r = score_attempt(word, wav, sr, model, config,
+                      transcript_provider=asr.provider_for(config.server_asr))
     if r.verdict in ("gated", "unscorable"):
         continue
     pilot.append(r.verdict_score)
     records.append((word, attempt, str(path), r.verdict_score, r.score,
                     r.verdict, " ".join(r.expected_phones),
-                    " ".join(r.observed_phones)))
+                    " ".join(r.observed_phones),
+                    r.transcript or "", r.transcript_matches))
 
 pilot = np.asarray(pilot)
 
@@ -76,11 +83,14 @@ out = Path("benchmarks/pilot_to_label.csv")
 out.parent.mkdir(parents=True, exist_ok=True)
 with out.open("w", encoding="utf-8") as fh:
     fh.write("word,attempt,audio,verdict_score,quality,pipeline_verdict,"
-             "expected_phones,heard_phones,human_label\n")
+             "expected_phones,heard_phones,asr_transcript,asr_matches,"
+             "human_label\n")
     for rec in sorted(records, key=lambda r: r[3]):
+        matches = "" if rec[9] is None else str(rec[9])
         fh.write(",".join([rec[0], str(rec[1]), rec[2],
                            f"{rec[3]:.3f}", f"{rec[4]:.3f}", rec[5],
-                           f'"{rec[6]}"', f'"{rec[7]}"', ""]) + "\n")
+                           f'"{rec[6]}"', f'"{rec[7]}"', f'"{rec[8]}"',
+                           matches, ""]) + "\n")
 print(f"\nwrote {out} ({len(records)} attempts, sorted worst-first)")
 print("Fill human_label with 1 (said correctly) or 0 (mispronounced), then")
 print("run scripts/refit_on_labels.py to set the threshold from your own data.")

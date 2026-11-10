@@ -1,0 +1,271 @@
+{
+ "participants": 1,
+ "attempts": 89,
+ "instrument": {
+  "utterance_length_words": {
+   "D": 12.9,
+   "K": 6.8
+  },
+  "gated_pct": 0.0,
+  "skipped_pct": 0.0,
+  "rated_clips": 0,
+  "false_correction_rate": null,
+  "kappa": null,
+  "note": "false-correction rate and kappa come from the rating tables once clips are rated (ratings export)"
+ },
+ "training": {
+  "K": {
+   "first_attempts": 14,
+   "first_correct": 12,
+   "first_accuracy_pct": 85.7,
+   "corrections": 2,
+   "second_attempts": 2,
+   "uptake": 1,
+   "uptake_pct": 50.0,
+   "graded_mean": 0.887,
+   "response_time_median_s": 2.27,
+   "feedback_words_mean": 6.8
+  },
+  "D": {
+   "first_attempts": 14,
+   "first_correct": 11,
+   "first_accuracy_pct": 78.6,
+   "corrections": 3,
+   "second_attempts": 3,
+   "uptake": 0,
+   "uptake_pct": 0.0,
+   "graded_mean": 0.809,
+   "response_time_median_s": 4.32,
+   "feedback_words_mean": 12.9
+  }
+ },
+ "learning": {
+  "overall": {
+   "pretest": {
+    "n": 21,
+    "correct": 12,
+    "accuracy_pct": 57.1,
+    "graded_mean": 0.835
+   },
+   "posttest": {
+    "n": 21,
+    "correct": 13,
+    "accuracy_pct": 61.9,
+    "graded_mean": 0.791
+   }
+  },
+  "by_feature": {
+   "trap_palm_strut": {
+    "pretest": "0 / 3",
+    "posttest": "0 / 3"
+   },
+   "kit_fleece": {
+    "pretest": "3 / 3",
+    "posttest": "2 / 3"
+   },
+   "foot_goose": {
+    "pretest": "2 / 3",
+    "posttest": "2 / 3"
+   },
+   "schwa_reduction": {
+    "pretest": "2 / 3",
+    "posttest": "3 / 3"
+   },
+   "dental_fricative": {
+    "pretest": "2 / 3",
+    "posttest": "1 / 3"
+   },
+   "polysyllabic_stress": {
+    "pretest": "3 / 3",
+    "posttest": "3 / 3"
+   },
+   "rhotic_lateral": {
+    "pretest": "0 / 3",
+    "posttest": "2 / 3"
+   }
+  }
+ },
+ "questionnaires": {
+  "godspeed": {
+   "D": {
+    "mean": 4.5,
+    "sd": null,
+    "n": 1
+   },
+   "K": {
+    "mean": 3.5,
+    "sd": null,
+    "n": 1
+   }
+  },
+  "motivation": {
+   "D": {
+    "mean": 3.14,
+    "sd": null,
+    "n": 1
+   },
+   "K": {
+    "mean": 4.86,
+    "sd": null,
+    "n": 1
+   }
+  },
+  "feedback_trust": {
+   "D": {
+    "mean": 3.6,
+    "sd": null,
+    "n": 1
+   },
+   "K": {
+    "mean": 4.4,
+    "sd": null,
+    "n": 1
+   }
+  }
+ },
+ "models": [
+  {
+   "label": "M1 first-attempt accuracy, K vs D",
+   "formula": "correct ~ D + block2",
+   "fit": "logistic regression",
+   "n": 28,
+   "note": "only 1 participant(s): random effects not estimable; fixed-effects form; complete separation in the data, so the coefficients are not estimable"
+  },
+  {
+   "label": "M2 uptake after a correction, K vs D",
+   "formula": "correct ~ D",
+   "fit": "logistic regression",
+   "n": 5,
+   "note": "only 1 participant(s): random effects not estimable; fixed-effects form; complete separation in the data, so the coefficients are not estimable"
+  },
+  {
+   "label": "M3 graded score, K vs D",
+   "formula": "graded_score ~ D + block2",
+   "fit": "OLS",
+   "note": "only 1 participant(s): random effects not estimable; OLS",
+   "n": 28,
+   "fixed_effects": {
+    "Intercept": [
+     0.565,
+     0.013
+    ],
+    "D": [
+     0.244,
+     0.021
+    ],
+    "block2": [
+     0.321,
+     0.021
+    ]
+   },
+   "p_values": {
+    "Intercept": 0.0,
+    "D": 0.0,
+    "block2": 0.0
+   }
+  },
+  {
+   "label": "M4 assessment accuracy over time",
+   "formula": "correct ~ post",
+   "fit": "logistic regression",
+   "note": "only 1 participant(s): random effects not estimable; fixed-effects form",
+   "n": 42,
+   "fixed_effects": {
+    "Intercept": [
+     0.288,
+     0.441
+    ],
+    "post": [
+     0.198,
+     0.63
+    ]
+   },
+   "odds_ratios": {
+    "post": 1.22
+   },
+   "p_values": {
+    "Intercept": 0.514,
+    "post": 0.753
+   }
+  },
+  {
+   "label": "M5 feedback_trust, K vs D",
+   "formula": "feedback_trust ~ D + block2",
+   "fit": "OLS",
+   "note": "only 1 participant(s): random effects not estimable; OLS",
+   "n": 2,
+   "fixed_effects": {
+    "Intercept": [
+     2.667,
+     null
+    ],
+    "D": [
+     0.933,
+     null
+    ],
+    "block2": [
+     1.733,
+     null
+    ]
+   },
+   "p_values": {
+    "Intercept": null,
+    "D": null,
+    "block2": null
+   }
+  },
+  {
+   "label": "M5 godspeed, K vs D",
+   "formula": "godspeed ~ D + block2",
+   "fit": "OLS",
+   "note": "only 1 participant(s): random effects not estimable; OLS",
+   "n": 2,
+   "fixed_effects": {
+    "Intercept": [
+     2.667,
+     null
+    ],
+    "D": [
+     1.833,
+     null
+    ],
+    "block2": [
+     0.833,
+     null
+    ]
+   },
+   "p_values": {
+    "Intercept": null,
+    "D": null,
+    "block2": null
+   }
+  },
+  {
+   "label": "M5 motivation, K vs D",
+   "formula": "motivation ~ D + block2",
+   "fit": "OLS",
+   "note": "only 1 participant(s): random effects not estimable; OLS",
+   "n": 2,
+   "fixed_effects": {
+    "Intercept": [
+     2.667,
+     null
+    ],
+    "D": [
+     0.473,
+     null
+    ],
+    "block2": [
+     2.193,
+     null
+    ]
+   },
+   "p_values": {
+    "Intercept": null,
+    "D": null,
+    "block2": null
+   }
+  }
+ ],
+ "source": "export in analysis/"
+}

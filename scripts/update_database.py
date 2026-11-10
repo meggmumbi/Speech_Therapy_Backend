@@ -48,7 +48,7 @@ from sqlalchemy.schema import CreateTable  # noqa: E402
 from app import models  # noqa: E402,F401
 from app.database import Base, engine  # noqa: E402
 
-AUDIO_DIR = Path("study_audio")
+AUDIO_DIR = Path("C:/Users/ADMIN/Music/study_audio")
 
 
 class Plan:

@@ -46,8 +46,10 @@ log = logging.getLogger(__name__)
 BEEP_PATH = Path("data/beep.tsv.gz")
 OVERRIDES_PATH = Path("data/pronunciation_overrides.json")
 
-# Bound the work: each variant costs a forced-alignment and GOP pass.
-MAX_VARIANTS = 12
+# Bound the work: each variant costs a forced-alignment and GOP pass (NumPy
+# Viterbi over an already-computed emission matrix -- a few ms each, against
+# several hundred for the acoustic model itself).
+MAX_VARIANTS = 16
 
 
 class ReferenceSource(str, Enum):
@@ -163,14 +165,102 @@ def non_rhotic_nurse(phones: list[str]) -> list[list[str]]:
     cost is that a genuine NURSE error is no longer detectable; but it never
     was, because the phone inventory cannot represent the contrast. This makes
     an existing blind spot explicit instead of scoring correct speech as wrong.
+
+    EH was added after the 2026-09-15 pilot: "colonel" was heard ``K EH N L``
+    in all four attempts by two speakers, "hyperbole" ``HH AY P EH B ...`` in
+    five of six, "determine" ``D IH T AH M ...``. A fronted, unrounded [3:] is
+    the usual Kenyan English realisation and the model's nearest label for it
+    is EH.
     """
     out: list[list[str]] = []
     if not any(strip_stress(p) == "ER" for p in phones):
         return out
-    for replacement in ("AA", "AH"):
+    for replacement in ("AA", "AH", "EH"):
         out.append([replacement if strip_stress(p) == "ER" else p
                     for p in phones])
     return out
+
+
+# Consonants that can carry a syllable on their own at the end of a word:
+# bottle, button, rhythm. The schwa before them is optional in every variety.
+_SYLLABIC = {"L", "N", "M"}
+
+
+def optional_syllabic_schwa(phones: list[str]) -> list[list[str]]:
+    """Accept both ``-CəL`` and ``-CL`` (and N, M) at the end of a word.
+
+    Dictionaries pick one. BEEP writes "subtle" ``S AH T L`` and "preferable"
+    ``P R EH F R AH B L`` with a syllabic consonant, but "chasm" ``K AE Z AH M``
+    with a schwa. Speakers do not follow the dictionary's choice: on the pilot
+    "preferable" was produced ``... B AH L`` (both attempts, marked wrong at
+    0.21 and 0.22), "colonel" ``K EH N AH L``, while "chasm" came out
+    ``K AE Z M`` and "infamous" ``IH N F M S``. The schwa's presence is not
+    contrastive anywhere in English, so both are accepted.
+
+    Only a schwa (AH) is inserted or removed, never a full vowel: "women"
+    ``W IH M IH N`` heard as ``W IH M N`` is left to the acoustic score.
+    """
+    out: list[list[str]] = []
+    if len(phones) < 2:
+        return out
+    last, before = strip_stress(phones[-1]), strip_stress(phones[-2])
+    if last in _SYLLABIC and not is_vowel(before):
+        # C L -> C AH L
+        out.append(phones[:-1] + ["AH", phones[-1]])
+    if (last in _SYLLABIC and before == "AH" and len(phones) >= 3
+            and not is_vowel(strip_stress(phones[-3]))):
+        # C AH L -> C L
+        out.append(phones[:-2] + [phones[-1]])
+    return out
+
+
+def final_cluster_reduction(phones: list[str]) -> list[list[str]]:
+    """Accept the everyday simplifications of two word-final clusters.
+
+    * ``TH S`` -> ``S`` / ``T S``: "months" as /mʌns/ or /mʌnts/. Nobody
+      produces the full /nθs/ in connected speech and few do in citation form;
+      the pilot's two attempts were scored 0.000 against it.
+    * ``DH Z`` -> ``Z``: "clothes" as /kləʊz/, the form most dictionaries list
+      as the primary British pronunciation. BEEP has only /kləʊðz/.
+
+    Listed as accepted variants, so the full cluster still scores when it is
+    produced. Kept to these two: they are the ones the study's word lists hit,
+    and every rule here trades away a detectable error for a false rejection
+    avoided, so each one should be argued for individually.
+    """
+    out: list[list[str]] = []
+    if len(phones) < 3:
+        return out
+    tail = [strip_stress(p) for p in phones[-2:]]
+    if tail == ["TH", "S"]:
+        out.append(phones[:-2] + ["S"])
+        out.append(phones[:-2] + ["T", "S"])
+    elif tail == ["DH", "Z"]:
+        out.append(phones[:-2] + ["Z"])
+    return out
+
+
+def final_l_vocalisation(phones: list[str]) -> list[str] | None:
+    """Accept a vocalised word-final dark /l/ heard as a back vowel.
+
+    Word-final /l/ after a consonant or schwa -- subtle, vehicle, rural -- is
+    routinely realised with little or no tongue-tip contact, and an
+    American-trained CTC model labels what remains as OW or UW. On the pilot
+    "subtle" was heard ``S AH T OW`` (both attempts), "vehicle" ``... K OW``
+    (both), "rural" ``R UW L OW``. The accepted variant replaces the final
+    ``(AH) L`` with ``OW``.
+
+    Cost: an /l/ genuinely dropped from the end of a word is no longer
+    reported. That is the right trade for a tutor scoring single words.
+    """
+    if len(phones) < 2 or strip_stress(phones[-1]) != "L":
+        return None
+    before = strip_stress(phones[-2])
+    if before == "AH" and len(phones) >= 3:
+        return phones[:-2] + ["OW"]
+    if not is_vowel(before):
+        return phones[:-1] + ["OW"]
+    return None
 
 
 def optional_yod(phones: list[str]) -> list[str] | None:
@@ -269,6 +359,17 @@ def realisation_variants(form: tuple[str, ...]) -> list[tuple[str, ...]]:
             produced = rule(candidate)
             if produced:
                 forms.append(produced)
+
+    # Word-final realisations, applied last so they see every vowel variant
+    # above. Order within the group matters only for which form lands inside
+    # MAX_VARIANTS first; the base form is always kept.
+    for candidate in list(forms):
+        forms.extend(optional_syllabic_schwa(candidate))
+        forms.extend(final_cluster_reduction(candidate))
+    for candidate in list(forms):
+        produced = final_l_vocalisation(candidate)
+        if produced:
+            forms.append(produced)
 
     seen = {tuple(base)}
     for candidate in forms:
@@ -391,7 +492,13 @@ def reference_for(word: str, accent: str = "en-GB") -> Reference | None:
 
     override = _load_overrides().get(target)
     if override:
-        return finish(override, ReferenceSource.OVERRIDE)
+        # The override fixes WHICH pronunciation is expected; the realisation
+        # rules describe how the acoustic model hears any pronunciation, so
+        # they apply here as much as to a dictionary form.
+        variants = list(override)
+        for form in list(override):
+            variants.extend(realisation_variants(form))
+        return finish(variants, ReferenceSource.OVERRIDE)
 
     if accent == "en-GB":
         beep = _load_beep().get(target)

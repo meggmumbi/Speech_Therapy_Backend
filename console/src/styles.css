@@ -1,0 +1,4 @@
+/* Material UI owns the look; this only sets the ground it sits on. */
+html, body, #root { height: 100%; margin: 0; }
+tr.clickable { cursor: pointer; }
+audio { height: 36px; }

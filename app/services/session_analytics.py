@@ -31,7 +31,8 @@ class SessionAnalytics:
 
         return {
             "session_id": session.id,
-            "child_name": session.child.name,
+            # Pseudonymous code, never a name -- see app/models/child.py.
+            "child_name": session.child.label,
             "category_name": session.category.name,
             "start_time": session.start_time,
             "duration_minutes": duration,

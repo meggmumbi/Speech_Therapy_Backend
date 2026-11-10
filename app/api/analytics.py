@@ -8,6 +8,7 @@ from ..services import performance_updater, Recommender, ProgressTracker
 from ..database import get_db
 from ..models import TherapySession, SessionActivity, ChildPerformance, Caregiver, CaregiverFeedback
 from ..services.session_analytics import SessionAnalytics
+from ..services import study_summary
 from ..utils.auth import get_current_user
 
 router = APIRouter(tags=["analytics"])
@@ -146,23 +147,25 @@ def get_progress_trends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/sessions/{session_id}/overview", response_model=schemas.SessionOverview)
+@router.get("/sessions/{session_id}/overview")
 def get_session_overview(
     session_id: uuid.UUID,
     db: Session = Depends(get_db)
 ):
-    """
-    Get comprehensive overview of a therapy session including:
-    - Basic session info
-    - Performance metrics
-    - Activity-by-activity breakdown
-    - Identified strengths
-    - Areas needing improvement
-    - Personalized recommendations
+    """What to show after a session ends.
+
+    Delegates to services/study_summary, which is aware of session types,
+    exercise types, target features and gated attempts. The previous
+    implementation predates all four, and worse, it scored assessments: it
+    computed an accuracy percentage and wrote encouragement whatever the
+    session was, which is feedback, on the screen the participant is looking
+    at, immediately after a test that is supposed to tell them nothing.
+
+    No longer declares a response_model. The old SessionOverview schema cannot
+    express a summary with no score in it, and coercing an assessment through
+    it would put zeros where the point is that there is no number.
     """
     try:
-        analyzer = SessionAnalytics(db)
-        overview = analyzer.get_session_overview(session_id)
-        return overview
+        return study_summary.build(db, session_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

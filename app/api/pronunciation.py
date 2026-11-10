@@ -20,7 +20,7 @@ import logging
 import math
 import uuid
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -29,10 +29,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .. import models
 from ..models import ActivityItem, SessionActivity, TherapySession
-from ..services.pronunciation import score_attempt
-from ..services.pronunciation.audio import to_mono_float32
-from ..services.pronunciation.feedback import generate_feedback
+from ..services import study_design
+from ..services import exercises
+from ..services.pronunciation import asr, score_attempt, score_sentence
+from ..services.pronunciation.audio import assess_quality, to_mono_float32
+from ..services.pronunciation.feedback import (assessment_acknowledgement,
+                                               generate_feedback)
 from ..services.pronunciation.runtime import get_config, get_model, is_ready
 
 log = logging.getLogger(__name__)
@@ -73,6 +77,34 @@ def _decode_wav(raw: bytes) -> tuple[np.ndarray, int]:
             ) from exc
         sample_rate = TARGET_SR
     return waveform, sample_rate
+
+
+def _parse_instant(value: str | None) -> datetime | None:
+    """An ISO-8601 instant from the tablet, or None if it was not sent.
+
+    Never raises. A clock the server cannot parse is worth losing; it is not
+    worth failing a participant's attempt over, since the derived response time
+    is a secondary measure and the recording is the primary one.
+    """
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        log.warning("unparseable client timestamp %r; storing null", value)
+        return None
+    # Stored as naive UTC to match every other timestamp in this schema.
+    # Mixing aware and naive values in one column makes ordering silently
+    # wrong, and an offset-bearing timestamp from a tablet set to EAT would
+    # otherwise sort three hours away from the server's own created_at.
+    if parsed.tzinfo is None:
+        return parsed
+    return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _finite(value: float) -> float | None:
+    """-inf loudness for a silent clip is not valid JSON and not valid SQL."""
+    return float(value) if math.isfinite(value) else None
 
 
 def _json_safe(value):
@@ -169,6 +201,23 @@ async def score_pronunciation_attempt(
     # right; it can never make a verdict worse. Optional so the endpoint keeps
     # working for clients that do not run an ASR.
     transcript: str | None = Form(None),
+    # Device-side instants, ISO-8601 from the tablet's clock. The response-time
+    # DV is prompt-end to speech-onset, and both of those happen on the tablet;
+    # timing them here would fold in upload latency and make the measure a
+    # property of the room's wifi. Optional, so an older client still works.
+    prompt_ended_at: str | None = Form(None),
+    speech_started_at: str | None = Form(None),
+    speech_ended_at: str | None = Form(None),
+    # How many times the participant asked to hear the prompt again before
+    # answering, and whether any of those was the slow replay. An item heard
+    # four times is not the same trial as one heard once, and slowing the model
+    # changes the stimulus rather than only the pacing.
+    prompt_replays: int = Form(0),
+    slow_replay_used: bool = Form(False),
+    # The revisit round at the end of a training block: one more attempt at
+    # each item the participant was corrected on. Stamped on the row and given
+    # no retry, whatever the verdict. See study_design.revisit_item_ids.
+    revisit: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """Score one spoken attempt and return the robot's next utterance."""
@@ -183,20 +232,45 @@ async def score_pronunciation_attempt(
     if not item:
         raise HTTPException(404, "Activity item not found")
 
-    # A study session is stamped with its condition by /study/sessions. A
-    # session created through the ordinary activities route has none: the app
-    # also serves non-study therapy, so this defaults rather than refusing --
-    # but it says so, and therapy_sessions.condition stays NULL, which is how
-    # analysis can exclude anything that was never properly assigned.
-    condition_source = "session" if session.condition else "default"
-    if condition_source == "default":
+    is_assessment = study_design.is_assessment(session.session_type)
+
+    # An unstamped session is one created through the ordinary activities
+    # route, with no session type and no condition. The app serves non-study
+    # therapy too, so that is allowed in general -- but not for someone who has
+    # a counterbalancing assignment. Every session recorded before 2026-09-17
+    # was unstamped, which is why not one of them can be attributed to a
+    # condition. Refusing at the first attempt is the only point at which a
+    # researcher can still fix it; by the end of the session the data exists
+    # and is already unusable.
+    if session.session_type is None:
+        assigned = (
+            db.query(models.StudyAssignment)
+            .filter(models.StudyAssignment.child_id == session.child_id)
+            .first()
+        )
+        if assigned and not assigned.excluded:
+            raise HTTPException(
+                409,
+                f"session {session_id} was not created as a study session, but "
+                f"this participant is enrolled in the study (group "
+                f"{assigned.group_index}). Start the session with "
+                f"POST /study/sessions or POST /study/assessments so the "
+                f"condition is recorded.",
+            )
         log.warning(
-            "session %s has no condition; scoring as D. Study sessions must be "
-            "created via POST /study/sessions.", session_id)
-    condition = (session.condition or "D").upper()
-    if condition not in ("K", "D"):
-        raise HTTPException(
-            500, f"session {session_id} has invalid condition {session.condition!r}")
+            "session %s has no session_type; scoring it as ad-hoc therapy. "
+            "Study sessions must be created via /study/sessions.", session_id)
+
+    if is_assessment:
+        # Assessments carry no condition, and nothing downstream may invent
+        # one: a row labelled K or D that was recorded under neither would be
+        # indistinguishable from real data in the analysis.
+        condition = None
+    else:
+        condition = (session.condition or "D").upper()
+        if condition not in ("K", "D"):
+            raise HTTPException(
+                500, f"session {session_id} has invalid condition {session.condition!r}")
 
     raw = await audio.read()
     if not raw:
@@ -205,6 +279,28 @@ async def score_pronunciation_attempt(
         raise HTTPException(413, "audio upload too large")
 
     waveform, sample_rate = _decode_wav(raw)
+
+    config = get_config()
+    # Judged before scoring, and recorded whatever the verdict. This is about
+    # the recording rather than the recognition: a clipped or near-silent clip
+    # still produces a confident, entirely wrong verdict, and on 2026-09-15 it
+    # did, with nothing in the stored row to say so. Bounds come from the
+    # pipeline config so the guard and the scorer agree on what is too short.
+    # What the participant was asked to say. Until now this was item.name in
+    # every case, and for a read-aloud item item.name is the *target word*:
+    # the participant read "He ate a banana for lunch." and the scorer aligned
+    # all of it against the six phones of "banana". Every correctly read
+    # sentence came back "incorrect", which is the failure last week's
+    # recordings show on every sentence item.
+    exercise_type = item.effective_type
+    spec = item.spec or {}
+    sentence = spec.get("sentence") if exercise_type == exercises.READ_SENTENCE else None
+    spoken_target = str(spec.get("target_word") or spec.get("word") or item.name)
+    max_speech = config.max_sentence_seconds if sentence else config.max_audio_seconds
+
+    quality = assess_quality(waveform, sample_rate,
+                             min_speech_s=config.min_audio_seconds,
+                             max_speech_s=max_speech)
 
     prior = db.query(SessionActivity).filter(
         SessionActivity.session_id == session_id,
@@ -216,25 +312,53 @@ async def score_pronunciation_attempt(
     # item without the participant ever having been scored.
     scored_before = sum(1 for a in prior if not a.gated)
 
-    config = get_config()
-    result = score_attempt(str(item.name), waveform, sample_rate,
-                           get_model(), config, transcript=transcript)
+    # Server-side recognition, invoked only if the acoustics say wrong and the
+    # client sent nothing to check that against. See services/asr.py.
+    provider = asr.provider_for(config.server_asr)
+    # The phones this item is testing are held to a stricter standard than
+    # the rest of the word; see PipelineConfig.focus_phone_rule.
+    focus = exercises.focus_phones_for(item.target_feature)
+    if sentence:
+        result = score_sentence(
+            sentence, spoken_target, waveform, sample_rate, get_model(), config,
+            transcript=transcript, transcript_provider=provider, focus_phones=focus,
+        )
+    else:
+        result = score_attempt(
+            spoken_target, waveform, sample_rate, get_model(), config,
+            transcript=transcript, transcript_provider=provider, focus_phones=focus,
+        )
 
     gated = result.verdict in ("gated", "unscorable")
     # Whether another attempt at this item follows. The client must not decide
     # this independently: the feedback wording depends on it, and two counters
     # drifting apart is how the robot ends up promising a retry it will not give.
+    #
+    # An assessment never offers one. A second attempt after an implicit "that
+    # was not right" is both feedback and practice, which is the thing an
+    # assessment exists not to provide.
+    if revisit and is_assessment:
+        raise HTTPException(400, "an assessment has no revisit round")
     retry_available = (
-        not result.is_correct
+        not is_assessment
+        and not revisit
+        and not result.is_correct
         and not gated
         and (scored_before + 1) < config.max_attempts_per_item
     )
 
-    # attempt_number - 1 so the first attempt of an item draws index 0, and K
-    # and D draw the same warmth marker at the same point in a session.
-    feedback = generate_feedback(result, str(item.name), condition,
-                                 attempt_index=attempt_number - 1,
-                                 retry_available=retry_available)
+    if is_assessment:
+        # Takes no result argument by design: there is no path from the verdict
+        # to what gets said, so no later edit can make an assessment leak
+        # correctness without changing that function's signature.
+        feedback = assessment_acknowledgement(attempt_index=attempt_number - 1)
+    else:
+        # attempt_number - 1 so the first attempt of an item draws index 0, and
+        # K and D draw the same warmth marker at the same point in a session.
+        feedback = generate_feedback(result, spoken_target, condition,
+                                     attempt_index=attempt_number - 1,
+                                     retry_available=retry_available,
+                                     sentence=sentence)
 
     audio_ref = _persist_audio(raw, session_id, item_id, attempt_number)
 
@@ -266,6 +390,22 @@ async def score_pronunciation_attempt(
         reference_needs_review=result.reference_needs_review,
         transcript=result.transcript,
         transcript_matches=result.transcript_matches,
+        prompt_ended_at=_parse_instant(prompt_ended_at),
+        speech_started_at=_parse_instant(speech_started_at),
+        speech_ended_at=_parse_instant(speech_ended_at),
+        prompt_replays=max(0, prompt_replays),
+        slow_replay_used=bool(slow_replay_used),
+        skipped=False,
+        revisit=bool(revisit),
+        celebration_shown=(feedback.kind == "praise"),
+        # Copied from the item at the time. Last week every sentence attempt
+        # was stored as NULL, i.e. repeat_word, and the summary could not tell
+        # a read-aloud error from a single-word one.
+        exercise_type=exercise_type,
+        audio_peak=quality.peak,
+        audio_rms_dbfs=_finite(quality.rms_dbfs),
+        audio_clipped_fraction=quality.clipped_fraction,
+        audio_quality=quality.verdict,
         audio_ref=audio_ref,
         pipeline_version=result.provenance.get("pipeline_version"),
         config_hash=result.provenance.get("config_hash"),
@@ -295,14 +435,32 @@ async def score_pronunciation_attempt(
         "persisted": attempt_id is not None,
         "attempt_number": attempt_number,
         "condition": condition,
-        "condition_source": condition_source,
+        "session_type": session.session_type,
+        # False in an assessment. The client does not decide this and must not
+        # infer it: it speaks whatever comes back in "feedback", which in an
+        # assessment is a fixed acknowledgement with no verdict in it.
+        "gives_feedback": not is_assessment,
         "is_correct": result.is_correct,
         "verdict": result.verdict,
         # gated attempts are a request to repeat, not a scored attempt, and
         # are excluded from correction-rate denominators in analysis
         "gated": gated,
+        # How usable the recording was, independent of how it scored. The app
+        # shows the advice to the researcher, not to the participant: a retake
+        # prompted by a bad microphone is a recording decision, not a
+        # judgement of how the participant spoke.
+        "audio_quality": {
+            "verdict": quality.verdict,
+            "usable": quality.usable,
+            "advice": quality.advice,
+            "peak": round(quality.peak, 4),
+            "rms_dbfs": _finite(round(quality.rms_dbfs, 1)),
+            "clipped_fraction": round(quality.clipped_fraction, 5),
+            "duration_s": round(quality.duration_s, 2),
+        },
         # Authoritative: the client advances the item when this is false.
         "should_retry": retry_available,
+        "revisit": bool(revisit),
         "score": result.score,
         "verdict_score": result.verdict_score,
         "confidence": result.confidence,
@@ -352,8 +510,11 @@ async def analyze_audio(
 
     waveform, sample_rate = _decode_wav(raw)
     config = get_config()
-    result = score_attempt(word, waveform, sample_rate, get_model(), config,
-                           transcript=transcript)
+    result = score_attempt(
+        word, waveform, sample_rate, get_model(), config,
+        transcript=transcript,
+        transcript_provider=asr.provider_for(config.server_asr),
+    )
 
     # Both conditions, so the wording of each can be compared side by side.
     feedback = {
@@ -409,6 +570,12 @@ def pronunciation_health():
     """Whether scoring is available, and under exactly which configuration."""
     config = get_config()
     payload = {"ready": is_ready(), **config.provenance()}
+    # Both safety nets, stated explicitly. Either one silently absent is how
+    # the 2026-09-15 pilot ran a morning of tests on a degraded scorer.
+    payload["server_asr"] = (
+        f"faster-whisper {config.server_asr}"
+        if asr.is_available(config.server_asr) else "inactive"
+    )
     if is_ready():
         info = get_model().describe()
         payload.update(

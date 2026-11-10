@@ -1,0 +1,215 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "hat"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "She put the hat on the table.",
+        "target_word": "hat"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "hat",
+          "heart"
+        ],
+        "answer": "hat"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "ship"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The ship is leaving the port.",
+        "target_word": "ship"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "ship",
+          "sheep"
+        ],
+        "answer": "ship"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "pull"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "Please pull the door open.",
+        "target_word": "pull"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "pull",
+          "pool"
+        ],
+        "answer": "pull"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "think"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "I think the answer is here.",
+        "target_word": "think"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "think",
+          "sink"
+        ],
+        "answer": "think"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "right"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "Turn right at the next corner.",
+        "target_word": "right"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "right",
+          "light"
+        ],
+        "answer": "right"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "banana"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "He ate a banana for lunch.",
+        "target_word": "banana"
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-sentence"
+    },
+    {
+      "exercise_type": "schwa_spot",
+      "spec": {
+        "word": "banana",
+        "syllables": [
+          "ba",
+          "na",
+          "na"
+        ],
+        "answer_indices": [
+          0,
+          2
+        ]
+      },
+      "target_feature": "schwa_reduction",
+      "match_key": "schwa_reduction-tap"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "photography"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-say"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "She studies photography at college.",
+        "target_word": "photography"
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-sentence"
+    },
+    {
+      "exercise_type": "stress_place",
+      "spec": {
+        "word": "photography",
+        "syllables": [
+          "pho",
+          "to",
+          "gra",
+          "phy"
+        ],
+        "answer_index": 1
+      },
+      "target_feature": "polysyllabic_stress",
+      "match_key": "polysyllabic_stress-tap"
+    }
+  ]
+}

@@ -41,6 +41,20 @@ def create_child(
         db: Session = Depends(get_db),
         current_user: models.Caregiver = Depends(get_current_user)
 ):
+    # Reject a duplicate participant code before writing. The database has a
+    # unique index as the real guard, but an explicit 409 tells the researcher
+    # what happened at the point of enrolment, when it is still fixable. Two
+    # rows for one person cannot be untangled from the session data afterwards.
+    existing = db.query(models.Child).filter(
+        models.Child.participant_code == child.participant_code
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"participant_code {child.participant_code} is already "
+                   f"enrolled. Use a new code, or open the existing record.",
+        )
+
     # Create the child object without the areas_of_interest_ids
     child_data = child.dict(exclude={"areas_of_interest_ids"})
     db_child = models.Child(**child_data,caregiver_id=current_user.id)
@@ -243,10 +257,15 @@ async def get_child_recommendations(
         if not child:
             raise HTTPException(status_code=404, detail="Child not found")
 
+        # Only non-identifying fields leave this server. The participant code
+        # is pseudonymous and the language background is what makes a
+        # recommendation useful; a name would be a direct identifier sent to a
+        # third party for no benefit.
         child_data = {
-            "name": child.name,
+            "participant_code": child.label,
             "age": child.age,
-            "therapy_goals": child.therapy_goals,
+            "first_language": child.first_language,
+            "self_rated_english": child.self_rated_english,
             "notes": child.notes
         }
 
@@ -300,7 +319,8 @@ async def get_child_recommendations(
             model="gpt-3.5-turbo",
             input=[
                 {"role": "system",
-                 "content": "You are a helpful therapy assistant that provides recommendations for children with ASD. "},
+                 "content": "You are a helpful tutoring assistant that recommends pronunciation "
+                            "practice activities for second-language English learners. "},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
@@ -312,7 +332,7 @@ async def get_child_recommendations(
 
         return {
             "child_id": child_id,
-            "child_name": child.name,
+            "child_name": child.label,
             "recommendations": recommendations,
             "prompt_used": prompt,
             "timestamp": datetime.utcnow()
@@ -329,11 +349,12 @@ def generate_chatgpt_prompt(
 ) -> str:
     """Generate the ChatGPT prompt from the collected data"""
     prompt = f"""
-Given the following Data from a therapy session for a child with ASD Using Pepper robot tablet during a speech therapy session where we are using visual aids with pictures for the item categories.
-**Child Information:**
-- Name: {child_data['name']}
+Given the following data from a pronunciation tutoring session using a Pepper robot tablet, where visual aids with pictures are used for the item categories.
+**Participant Information:**
+- Code: {child_data['participant_code']}
 - Age: {child_data['age']}
-- Therapy Goals: {child_data['therapy_goals']}
+- First language: {child_data['first_language']}
+- Self-rated English (CEFR): {child_data['self_rated_english']}
 - Notes: {child_data['notes']}
 
 **Latest Performance Data:**

@@ -17,6 +17,23 @@ class ActivityCategory(Base):
     type = Column(String(50))
     difficulty_level = Column(String(20))
 
+    # Which part of the study this category is: training list A, training list
+    # B, the assessment set, or NULL for an ordinary practice category.
+    #
+    # This used to live in three environment variables on the server. A fact
+    # about the experiment was being kept in deployment configuration that is
+    # not in version control, and as of 2026-09-17 was unset, which is what was
+    # blocking a study run. Unique where it is set, because two categories both
+    # claiming to be list A is not a state the design can be run from.
+    study_role = Column(String(12), unique=True)
+
+    # The role this category held before a newer list took it over. The pilot
+    # lists were used for real sessions, so the role could not simply be
+    # removed from them without those sessions losing their list label in
+    # every export; it is kept here instead. A category with a retired role
+    # is never chosen for a new session.
+    retired_study_role = Column(String(12))
+
     items = relationship(
         "ActivityItem",
         back_populates="category",

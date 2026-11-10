@@ -1,0 +1,333 @@
+{
+ "participants": 40,
+ "attempts": 4026,
+ "instrument": {
+  "utterance_length_words": {
+   "D": 14.0,
+   "K": 7.0
+  },
+  "gated_pct": 0.0,
+  "skipped_pct": 0.0,
+  "rated_clips": 0,
+  "false_correction_rate": null,
+  "kappa": null,
+  "note": "false-correction rate and kappa come from the rating tables once clips are rated (ratings export)"
+ },
+ "training": {
+  "K": {
+   "first_attempts": 560,
+   "first_correct": 372,
+   "first_accuracy_pct": 66.4,
+   "corrections": 188,
+   "second_attempts": 188,
+   "uptake": 72,
+   "uptake_pct": 38.3,
+   "graded_mean": 0.654,
+   "response_time_median_s": 1.76,
+   "feedback_words_mean": 7.0
+  },
+  "D": {
+   "first_attempts": 560,
+   "first_correct": 362,
+   "first_accuracy_pct": 64.6,
+   "corrections": 198,
+   "second_attempts": 198,
+   "uptake": 104,
+   "uptake_pct": 52.5,
+   "graded_mean": 0.642,
+   "response_time_median_s": 1.82,
+   "feedback_words_mean": 14.0
+  }
+ },
+ "learning": {
+  "overall": {
+   "pretest": {
+    "n": 840,
+    "correct": 573,
+    "accuracy_pct": 68.2,
+    "graded_mean": 0.675
+   },
+   "posttest": {
+    "n": 840,
+    "correct": 656,
+    "accuracy_pct": 78.1,
+    "graded_mean": 0.765
+   },
+   "delayed": {
+    "n": 840,
+    "correct": 622,
+    "accuracy_pct": 74.0,
+    "graded_mean": 0.73
+   }
+  },
+  "by_feature": {
+   "trap_palm_strut": {
+    "pretest": "74 / 120",
+    "posttest": "81 / 120",
+    "delayed": "75 / 120"
+   },
+   "kit_fleece": {
+    "pretest": "78 / 120",
+    "posttest": "100 / 120",
+    "delayed": "84 / 120"
+   },
+   "foot_goose": {
+    "pretest": "77 / 120",
+    "posttest": "88 / 120",
+    "delayed": "83 / 120"
+   },
+   "schwa_reduction": {
+    "pretest": "83 / 120",
+    "posttest": "100 / 120",
+    "delayed": "98 / 120"
+   },
+   "dental_fricative": {
+    "pretest": "90 / 120",
+    "posttest": "103 / 120",
+    "delayed": "108 / 120"
+   },
+   "polysyllabic_stress": {
+    "pretest": "85 / 120",
+    "posttest": "94 / 120",
+    "delayed": "84 / 120"
+   },
+   "rhotic_lateral": {
+    "pretest": "86 / 120",
+    "posttest": "90 / 120",
+    "delayed": "90 / 120"
+   }
+  }
+ },
+ "questionnaires": {
+  "godspeed": {
+   "D": {
+    "mean": 4.47,
+    "sd": 1.26,
+    "n": 40
+   },
+   "K": {
+    "mean": 4.57,
+    "sd": 0.78,
+    "n": 40
+   }
+  },
+  "motivation": {
+   "D": {
+    "mean": 4.75,
+    "sd": 0.86,
+    "n": 40
+   },
+   "K": {
+    "mean": 4.71,
+    "sd": 0.99,
+    "n": 40
+   }
+  },
+  "feedback_trust": {
+   "D": {
+    "mean": 4.51,
+    "sd": 0.9,
+    "n": 40
+   },
+   "K": {
+    "mean": 4.1,
+    "sd": 0.79,
+    "n": 40
+   }
+  }
+ },
+ "models": [
+  {
+   "label": "M1 first-attempt accuracy, K vs D",
+   "formula": "correct ~ D + block2 + (1|participant) + (1|item)",
+   "fit": "Bayesian mixed GLM (variational)",
+   "n": 1120,
+   "fixed_effects": {
+    "Intercept": [
+     0.714,
+     0.066
+    ],
+    "D": [
+     -0.084,
+     0.093
+    ],
+    "block2": [
+     0.124,
+     0.094
+    ]
+   },
+   "odds_ratios": {
+    "D": 0.92,
+    "block2": 1.13
+   },
+   "random_sd": {
+    "participant": 0.72,
+    "item": 0.29
+   }
+  },
+  {
+   "label": "M2 uptake after a correction, K vs D",
+   "formula": "correct ~ D + (1|participant) + (1|item)",
+   "fit": "Bayesian mixed GLM (variational)",
+   "n": 386,
+   "fixed_effects": {
+    "Intercept": [
+     -0.427,
+     0.107
+    ],
+    "D": [
+     0.631,
+     0.148
+    ]
+   },
+   "odds_ratios": {
+    "D": 1.88
+   },
+   "random_sd": {
+    "participant": 0.47,
+    "item": 0.44
+   }
+  },
+  {
+   "label": "M3 graded score, K vs D",
+   "formula": "graded_score ~ D + block2 + (1|participant) + (1|item)",
+   "fit": "linear mixed model (REML)",
+   "n": 1120,
+   "fixed_effects": {
+    "Intercept": [
+     0.649,
+     0.024
+    ],
+    "D": [
+     -0.012,
+     0.008
+    ],
+    "block2": [
+     0.01,
+     0.008
+    ]
+   },
+   "p_values": {
+    "Intercept": 0.0,
+    "D": 0.157,
+    "block2": 0.251
+   }
+  },
+  {
+   "label": "M4 assessment accuracy over time",
+   "formula": "correct ~ post + delayed + (1|participant) + (1|item)",
+   "fit": "Bayesian mixed GLM (variational)",
+   "n": 2520,
+   "fixed_effects": {
+    "Intercept": [
+     0.921,
+     0.049
+    ],
+    "post": [
+     0.592,
+     0.089
+    ],
+    "delayed": [
+     0.334,
+     0.084
+    ]
+   },
+   "odds_ratios": {
+    "post": 1.81,
+    "delayed": 1.4
+   },
+   "random_sd": {
+    "participant": 0.84,
+    "item": 0.58
+   }
+  },
+  {
+   "label": "M5 feedback_trust, K vs D",
+   "formula": "feedback_trust ~ D + block2 + (1|participant)",
+   "fit": "linear mixed model (REML)",
+   "n": 80,
+   "fixed_effects": {
+    "Intercept": [
+     4.011,
+     0.156
+    ],
+    "D": [
+     0.416,
+     0.159
+    ],
+    "block2": [
+     0.173,
+     0.159
+    ]
+   },
+   "p_values": {
+    "Intercept": 0.0,
+    "D": 0.009,
+    "block2": 0.277
+   }
+  },
+  {
+   "label": "M5 godspeed, K vs D",
+   "formula": "godspeed ~ D + block2 + (1|participant)",
+   "fit": "linear mixed model (REML)",
+   "n": 80,
+   "fixed_effects": {
+    "Intercept": [
+     4.622,
+     0.204
+    ],
+    "D": [
+     -0.096,
+     0.235
+    ],
+    "block2": [
+     -0.107,
+     0.235
+    ]
+   },
+   "p_values": {
+    "Intercept": 0.0,
+    "D": 0.682,
+    "block2": 0.649
+   }
+  },
+  {
+   "label": "M5 motivation, K vs D",
+   "formula": "motivation ~ D + block2 + (1|participant)",
+   "fit": "linear mixed model (REML)",
+   "n": 80,
+   "fixed_effects": {
+    "Intercept": [
+     4.929,
+     0.174
+    ],
+    "D": [
+     0.034,
+     0.197
+    ],
+    "block2": [
+     -0.432,
+     0.197
+    ]
+   },
+   "p_values": {
+    "Intercept": 0.0,
+    "D": 0.862,
+    "block2": 0.028
+   }
+  }
+ ],
+ "source": "simulated N=40",
+ "assumptions": {
+  "base_first": 0.65,
+  "d_first_or": 1.0,
+  "base_uptake": 0.45,
+  "d_uptake_or": 2.0,
+  "post_gain_or": 1.6,
+  "delayed_gain_or": 1.3,
+  "sd_participant": 0.8,
+  "sd_item": 0.5,
+  "trust_d": 0.4,
+  "sd_scale": 0.9
+ }
+}

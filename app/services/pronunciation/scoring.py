@@ -26,10 +26,11 @@ estimate.
 
 from __future__ import annotations
 
+import logging
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Iterator, Literal, Sequence
+from typing import Callable, Collection, Iterator, Literal, Sequence
 
 import numpy as np
 
@@ -47,6 +48,8 @@ from .md_features import word_positions
 from .md_scorer import load_md_layer
 from .references import Reference, ReferenceSource, reference_for
 from .prosody import StressAnalysis, analyse_stress
+
+log = logging.getLogger(__name__)
 
 Verdict = Literal["correct", "close", "stress_error", "incorrect", "gated", "unscorable"]
 
@@ -107,6 +110,10 @@ class AttemptScore:
     reference_needs_review: bool = False  # true when the target is a g2p prediction
     transcript: str | None = None         # ASR transcript, when the client sent one
     transcript_matches: bool | None = None
+    # Target-feature phones that failed the stricter standard; see
+    # PipelineConfig.focus_phone_rule. Non-empty means not correct, whatever
+    # the aggregate said, and feedback names the first of these.
+    focus_errors: tuple[PhoneDiagnosis, ...] = ()
 
 
 def _gated(word: str, verdict: Verdict, note: str, confidence: float,
@@ -128,6 +135,7 @@ def _score_variant(
     phone_log_probs: np.ndarray,
     phone_to_id: dict[str, int],
     frame_weights: np.ndarray,
+    positions: Sequence[int] | None = None,
 ) -> tuple[float, list[PhoneScore], list, list[tuple[str, str]]] | None:
     """Forced-align and GOP-score one dictionary variant. None if unalignable.
 
@@ -151,14 +159,15 @@ def _score_variant(
     # CTC peaks are one frame wide; widen them to real phone segments before
     # averaging anything over them.
     spans = expand_spans(spans, emissions.n_frames)
-    # Single words in the confirmatory study, so the whole variant is one
-    # word; position tells the layer whether a phone is word-initial, medial
-    # or final, which it learned to weight differently.
+    # Position tells the MD layer whether a phone is word-initial, medial or
+    # final, which it learned to weight differently. A single word is the
+    # default; a sentence passes the per-word positions in, so a word-final
+    # stop in the middle of a sentence is still scored as word-final.
     phone_scores = compute_phone_scores(
         phone_log_probs, spans, list(variant), phone_to_id, config.gop_floor,
         frame_weights=frame_weights,
         md_layer=load_md_layer() if config.use_md_layer else None,
-        positions=word_positions(len(variant)),
+        positions=list(positions) if positions is not None else word_positions(len(variant)),
     )
     return (
         word_score(phone_scores, config.duration_weighted_score),
@@ -248,6 +257,45 @@ def _corroborated_errors(diagnoses: Sequence[PhoneDiagnosis],
     ]
 
 
+def _focus_errors(diagnoses: Sequence[PhoneDiagnosis],
+                  focus_phones: Collection[str] | None,
+                  ceiling: float) -> list[PhoneDiagnosis]:
+    """Substitutions or deletions of a phone the item is testing, scored
+    below ``ceiling`` (the verdict threshold, not the looser phone_error).
+
+    Two signals still have to agree, as everywhere in this module: the
+    decode must have heard something else there AND the forced alignment
+    must have scored the expected phone below the line. A focus phone the
+    decode matched is never failed on its score alone, and a phone the
+    decode slipped on but the acoustics were sure of is not failed either.
+    """
+    if not focus_phones:
+        return []
+    focus = {strip_stress(p) for p in focus_phones}
+    return [
+        d for d in diagnoses
+        if d.kind in ("substitution", "deletion")
+        and strip_stress(d.expected) in focus
+        and d.score < ceiling
+    ]
+
+
+def _weak_focus(diagnoses: Sequence[PhoneDiagnosis],
+                focus_phones: Collection[str] | None) -> list[PhoneDiagnosis]:
+    """Focus phones the decode matched but the acoustics scored as an error.
+
+    Not an error on their own: the decode agreeing is one signal for the
+    phone. They become one when a recogniser, asked, does not hear the
+    target word either. "rice" said as "lice" a second time decoded as
+    R IH L AY S -- a spurious R before the L -- so the R was "matched",
+    scored 0.45, and the word passed at 0.61; Whisper wrote "Nice".
+    """
+    if not focus_phones:
+        return []
+    focus = {strip_stress(p) for p in focus_phones}
+    return [d for d in diagnoses if d.kind == "weak" and strip_stress(d.expected) in focus]
+
+
 def transcript_matches_target(transcript: str | None, target: str,
                               reference: Reference | None) -> bool | None:
     """Did the client's ASR hear the target word?
@@ -265,6 +313,13 @@ def transcript_matches_target(transcript: str | None, target: str,
         return False
     if heard == target:
         return True
+    # A sentence item: the recogniser returns the whole carrier sentence, and
+    # the question is whether the target word is in it. Before this the
+    # transcript "He ate a banana for lunch." was compared whole against
+    # "banana", never matched, and the rescue that exists to stop false
+    # rejections never fired on a single sentence item.
+    if len(target.split()) == 1 and len(heard.split()) > 1:
+        return target in heard.split()
     # A single-word target heard as one word: compare pronunciations.
     if reference is not None and len(heard.split()) == 1:
         try:
@@ -288,8 +343,14 @@ def _classify(
     config: PipelineConfig,
     transcript_match: bool | None = None,
     phone_scores: Sequence[PhoneScore] = (),
+    focus_errors: Sequence[PhoneDiagnosis] = (),
 ) -> Verdict:
     """Decide the verdict from the acoustic evidence, with an ASR safety net.
+
+    ``focus_errors`` are failures on the phones the item is testing (see
+    :func:`_focus_errors`). Any one of them makes the attempt not correct and
+    closes the transcript rescue: the recogniser's word identity cannot vouch
+    for a contrast its language model restores on its own.
 
     The acoustic path decides on its own merits first. A matching ASR
     transcript can then *rescue* an attempt the acoustics called wrong, but a
@@ -309,11 +370,14 @@ def _classify(
     """
     t = config.thresholds
     segmental_errors = _corroborated_errors(diagnoses, t.phone_error)
+    # Whether the stress detector is trusted enough to fail an attempt on its
+    # own -- see PipelineConfig.stress_can_fail_verdict for why it is not yet.
+    stress_counts = config.stress_can_fail_verdict
 
-    if score >= t.correct and not segmental_errors:
-        # Correct segmentally; a stress error still makes the word wrong, and
-        # is the one the learner most needs told.
-        if stress is not None and stress.is_error:
+    if score >= t.correct and not segmental_errors and not focus_errors:
+        # Correct segmentally. A stress error would still make the word wrong,
+        # but only if the detector can be trusted to have found one.
+        if stress_counts and stress is not None and stress.is_error:
             return "stress_error"
         return "correct"
 
@@ -324,18 +388,27 @@ def _classify(
         ) / len(phone_scores)
 
     if (config.trust_transcript and transcript_match
-            and supported >= config.transcript_rescue_min_phone_fraction):
+            and supported >= config.transcript_rescue_min_phone_fraction
+            and not focus_errors):
         # The recogniser heard the target word and the audio supports most of
         # its phones: do not call this wrong.
-        if stress is not None and stress.is_error:
+        if stress_counts and stress is not None and stress.is_error:
             return "stress_error"
         return "correct"
 
-    if stress is not None and stress.is_error and not segmental_errors:
+    if (stress_counts and stress is not None and stress.is_error
+            and not segmental_errors):
         return "stress_error"
     if score >= t.close:
         return "close"
     return "incorrect"
+
+
+# Called with the *trimmed* waveform and its sample rate, so the recogniser
+# sees the same audio the scorer did. Leading and trailing silence measurably
+# hurt Whisper on single words: the same clip that read "Onamat appear"
+# untrimmed read "Onomatopoeia" trimmed.
+TranscriptProvider = Callable[[np.ndarray, int], "str | None"]
 
 
 def score_attempt(
@@ -345,8 +418,13 @@ def score_attempt(
     model: AcousticModel,
     config: PipelineConfig = DEFAULT_CONFIG,
     transcript: str | None = None,
+    transcript_provider: TranscriptProvider | None = None,
+    focus_phones: Collection[str] | None = None,
 ) -> AttemptScore:
     """Score one spoken attempt at ``word``.
+
+    ``focus_phones`` are the phones the item is testing, held to the
+    stricter standard described at ``PipelineConfig.focus_phone_rule``.
 
     ``waveform`` is mono float32 in ``[-1, 1]`` at ``sample_rate``. Decoding and
     resampling belong to the transport layer, not here, so that this function
@@ -355,6 +433,12 @@ def score_attempt(
     ``transcript`` is the client's ASR output, when available. It is used only
     as a guard against false negatives -- never to lower a score. See
     :func:`_classify`.
+
+    ``transcript_provider`` is a fallback for when the client sent none: a
+    callable that produces a transcript on demand (server-side ASR). It is
+    invoked only if the acoustic verdict comes out as not correct, so a correct
+    attempt never pays its latency, and the graded score is unaffected either
+    way.
     """
     timings = Timings()
     target = normalize_text(word)
@@ -370,7 +454,9 @@ def score_attempt(
 
     return score_phone_sequence(target, reference.variants, waveform,
                                 sample_rate, model, config, timings,
-                                reference=reference, transcript=transcript)
+                                reference=reference, transcript=transcript,
+                                transcript_provider=transcript_provider,
+                                focus_phones=focus_phones)
 
 
 def score_phone_sequence(
@@ -383,8 +469,21 @@ def score_phone_sequence(
     timings: Timings | None = None,
     reference: Reference | None = None,
     transcript: str | None = None,
+    transcript_provider: TranscriptProvider | None = None,
+    context: tuple[Sequence[Sequence[str]], Sequence[Sequence[str]]] | None = None,
+    max_seconds: float | None = None,
+    focus_phones: Collection[str] | None = None,
 ) -> AttemptScore:
     """Score audio against an explicit set of accepted phone sequences.
+
+    ``context`` is the carrier words around a target inside a sentence, as
+    ``(leading_words, trailing_words)``, each a sequence of per-word phone
+    sequences. The whole sentence is aligned -- the carrier words anchor the
+    alignment, which is the point of having them -- but every judgement
+    (verdict, graded score, diagnosis, stress) is made over the target word's
+    phones alone. Without this, a sentence item was scored by aligning a
+    25-phone utterance against the 6 phones of its target word, and every
+    correctly read sentence came back "incorrect".
 
     The lexicon-free core of :func:`score_attempt`. Split out because
     benchmark corpora (Speechocean762 among them) ship their own canonical
@@ -413,9 +512,16 @@ def score_phone_sequence(
     if duration < config.min_audio_seconds:
         return _gated(target, "unscorable",
                       f"recording too short ({duration:.2f}s)", 0.0, timings, config)
-    if duration > config.max_audio_seconds:
+    ceiling = max_seconds if max_seconds is not None else config.max_audio_seconds
+    if duration > ceiling:
         return _gated(target, "unscorable",
                       f"recording too long ({duration:.2f}s)", 0.0, timings, config)
+
+    leading = tuple(tuple(w) for w in (context[0] if context else ()))
+    trailing = tuple(tuple(w) for w in (context[1] if context else ()))
+    lead_phones = tuple(p for w in leading for p in w)
+    trail_phones = tuple(p for w in trailing for p in w)
+    w0 = len(lead_phones)
 
     with timings.stage("acoustic"):
         emissions = model.emissions(waveform, sample_rate)
@@ -437,18 +543,30 @@ def score_phone_sequence(
     with timings.stage("forced_align"):
         best = None
         for variant in variants:
-            scored = _score_variant(emissions, variant, config,
+            full = lead_phones + tuple(variant) + trail_phones
+            positions = [pos for w in (*leading, tuple(variant), *trailing)
+                         for pos in word_positions(len(w))]
+            scored = _score_variant(emissions, full, config,
                                     phone_log_probs, phone_to_id,
-                                    frame_weights)
+                                    frame_weights, positions=positions)
             if scored is None:
                 continue
-            if best is None or scored[0] > best[0]:
-                best = (scored[0], scored[1], scored[2], variant, scored[3])
+            # Choose the target variant by how well the *target* fits, not by
+            # the whole sentence: the carrier words are the same for every
+            # variant and would only dilute the comparison.
+            w1 = w0 + len(variant)
+            focus_score = word_score(scored[1][w0:w1], config.duration_weighted_score)
+            if best is None or focus_score > best[0]:
+                best = (focus_score, scored[1], scored[2], full, scored[3], w1)
     if best is None:
         return _gated(target, "unscorable",
                       "no dictionary variant could be aligned to the audio",
                       confidence, timings, config)
-    utterance_score, phone_scores, spans, expected, folds = best
+    utterance_score, phone_scores_full, spans_full, expected_full, folds, w1 = best
+    # Everything judged from here on is judged over the target word only.
+    phone_scores = phone_scores_full[w0:w1]
+    spans = spans_full[w0:w1]
+    expected = expected_full[w0:w1]
 
     with timings.stage("decode"):
         observed = greedy_phone_decode(
@@ -456,8 +574,12 @@ def score_phone_sequence(
         )
 
     with timings.stage("align_phones"):
-        ops = align_phones([strip_stress(p) for p in expected], observed,
-                           gap_cost=config.gap_cost)
+        ops_full = align_phones([strip_stress(p) for p in expected_full], observed,
+                                gap_cost=config.gap_cost)
+        # Only the target's edits are diagnosed. Insertions carry no expected
+        # index and no acoustic evidence, and already cannot fail a word.
+        ops = [op for op in ops_full
+               if op.expected_index is not None and w0 <= op.expected_index < w1]
 
     with timings.stage("stress"):
         # BEEP variants carry no stress marks, so the expected stress pattern
@@ -497,10 +619,46 @@ def score_phone_sequence(
             quantile=config.verdict_quantile, k=config.verdict_worst_k,
         )
         diagnoses = _diagnose(phone_scores, ops, config)
+        focus_errors = (_focus_errors(diagnoses, focus_phones, config.thresholds.correct)
+                        if config.focus_phone_rule else [])
         heard_target = transcript_matches_target(transcript, target, reference)
         verdict = _classify(verdict_score, diagnoses, stress, config,
                             transcript_match=heard_target,
-                            phone_scores=phone_scores)
+                            phone_scores=phone_scores,
+                            focus_errors=focus_errors)
+
+    weak_focus = (_weak_focus(diagnoses, focus_phones)
+                  if config.focus_phone_rule and config.weak_focus_asks_recogniser
+                  and verdict == "correct" else [])
+    if ((verdict != "correct" or weak_focus) and transcript is None
+            and transcript_provider is not None):
+        # The acoustics say wrong and no client transcript exists to check
+        # that against: now, and only now, ask the server-side recogniser.
+        # Its answer can rescue the verdict but never worsen it -- with one
+        # exception, below, for a weak target-feature phone.
+        with timings.stage("asr"):
+            try:
+                transcript = transcript_provider(waveform, sample_rate)
+            except Exception:  # noqa: BLE001 - ASR failure must not fail scoring
+                log.exception("server-side ASR failed; verdict stands")
+                transcript = None
+        if transcript is not None:
+            heard_target = transcript_matches_target(transcript, target, reference)
+            verdict = _classify(verdict_score, diagnoses, stress, config,
+                                transcript_match=heard_target,
+                                phone_scores=phone_scores,
+                                focus_errors=focus_errors)
+    if weak_focus and heard_target is False:
+        # The one place a transcript may condemn. The acoustics scored the
+        # item's own target phone as an error, and an independent recogniser
+        # did not hear the target word: two models, neither of which heard
+        # the contrast. A transcript that does contain the target leaves the
+        # verdict alone, as does having no transcript at all.
+        focus_errors = list(focus_errors) + weak_focus
+        verdict = _classify(verdict_score, diagnoses, stress, config,
+                            transcript_match=heard_target,
+                            phone_scores=phone_scores,
+                            focus_errors=focus_errors)
 
     return AttemptScore(
         word=target,
@@ -523,4 +681,62 @@ def score_phone_sequence(
         transcript_matches=heard_target,
         timings=timings,
         provenance=config.provenance(),
+        focus_errors=tuple(focus_errors),
+    )
+
+
+def score_sentence(
+    sentence: str,
+    target_word: str,
+    waveform: np.ndarray,
+    sample_rate: int,
+    model: AcousticModel,
+    config: PipelineConfig = DEFAULT_CONFIG,
+    transcript: str | None = None,
+    transcript_provider: TranscriptProvider | None = None,
+    focus_phones: Collection[str] | None = None,
+) -> AttemptScore:
+    """Score one word read inside a carrier sentence.
+
+    The whole sentence is aligned and only the target word is judged. The
+    carrier words are alignment context: they tell the aligner where in the
+    audio the target sits, which is far more reliable than trying to find a
+    six-phone word inside three seconds of speech with nothing to anchor it.
+
+    Carrier words take their primary pronunciation only. The target keeps every
+    accepted variant, because that is the word being assessed; giving every
+    carrier every variant would multiply the alignment count by the product of
+    their variant counts for no gain in what is measured.
+    """
+    timings = Timings()
+    words = normalize_text(sentence).split()
+    target = normalize_text(target_word)
+    if not words:
+        return _gated(target, "unscorable", "empty sentence", 0.0, timings, config)
+    if target not in words:
+        return _gated(target, "unscorable",
+                      f"target {target!r} is not in the sentence", 0.0, timings, config)
+    index = words.index(target)
+
+    try:
+        with timings.stage("lexicon"):
+            refs = [reference_for(w, accent=config.accent) for w in words]
+    except ResourceUnavailable as exc:
+        return _gated(target, "unscorable", str(exc), 0.0, timings, config)
+    missing = [w for w, r in zip(words, refs) if r is None]
+    if missing:
+        return _gated(target, "unscorable",
+                      f"no pronunciation known for {', '.join(missing)}",
+                      0.0, timings, config)
+
+    leading = [refs[i].primary for i in range(index)]
+    trailing = [refs[i].primary for i in range(index + 1, len(words))]
+    target_ref = refs[index]
+    return score_phone_sequence(
+        target, target_ref.variants, waveform, sample_rate, model, config,
+        timings, reference=target_ref, transcript=transcript,
+        transcript_provider=transcript_provider,
+        context=(leading, trailing),
+        max_seconds=config.max_sentence_seconds,
+        focus_phones=focus_phones,
     )

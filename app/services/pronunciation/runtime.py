@@ -112,6 +112,26 @@ def warmup() -> None:
             "If the cache is empty, run: "
             "python scripts/setup_resources.py --download-model")
 
+    # The two safety nets load here too, so that (a) their absence is visible
+    # in the start-up log rather than discovered mid-session and (b) the first
+    # participant does not pay their cold start.
+    config = get_config()
+    if config.use_md_layer:
+        from .md_scorer import load_md_layer
+        if load_md_layer() is None:
+            log.warning("MD layer INACTIVE: verdicts will run on raw GOP against "
+                        "thresholds fitted for the MD scale")
+    if config.server_asr:
+        try:
+            from . import asr
+            asr.warmup(config.server_asr)
+            if not asr.is_available(config.server_asr):
+                log.warning("server-side ASR INACTIVE: the transcript safety "
+                            "net is off; run scripts/setup_resources.py "
+                            "--download-asr")
+        except Exception:  # noqa: BLE001
+            log.exception("server-side ASR warm-up failed")
+
 
 def is_ready() -> bool:
     return _model is not None

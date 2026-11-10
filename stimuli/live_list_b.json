@@ -1,0 +1,189 @@
+{
+  "items": [
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "mastered"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "substantial"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "She mastered the technique in a week.",
+        "target_word": "mastered"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "mastered",
+          "mustard"
+        ],
+        "answer": "mastered"
+      },
+      "target_feature": "trap_palm_strut",
+      "match_key": "trap_palm_strut-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "filling"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "discipline"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The pie has a sweet filling.",
+        "target_word": "filling"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "filling",
+          "feeling"
+        ],
+        "answer": "filling"
+      },
+      "target_feature": "kit_fleece",
+      "match_key": "kit_fleece-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "cookie"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "unusual"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The cookie was still warm.",
+        "target_word": "cookie"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "cookie",
+          "kooky"
+        ],
+        "answer": "cookie"
+      },
+      "target_feature": "foot_goose",
+      "match_key": "foot_goose-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "worthy"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "methodology"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The cause is worthy of support.",
+        "target_word": "worthy"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "worthy",
+          "wordy"
+        ],
+        "answer": "worthy"
+      },
+      "target_feature": "dental_fricative",
+      "match_key": "dental_fricative-hear"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "arrive"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say"
+    },
+    {
+      "exercise_type": "repeat_word",
+      "spec": {
+        "word": "relevant"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-say2"
+    },
+    {
+      "exercise_type": "read_sentence",
+      "spec": {
+        "sentence": "The train will arrive at noon.",
+        "target_word": "arrive"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-sentence"
+    },
+    {
+      "exercise_type": "minimal_pair_id",
+      "spec": {
+        "options": [
+          "arrive",
+          "alive"
+        ],
+        "answer": "arrive"
+      },
+      "target_feature": "rhotic_lateral",
+      "match_key": "rhotic_lateral-hear"
+    }
+  ]
+}
